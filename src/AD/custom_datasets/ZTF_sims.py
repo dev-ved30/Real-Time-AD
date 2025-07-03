@@ -12,8 +12,8 @@ from PIL import Image
 from tqdm import tqdm
 from torch.nn.utils.rnn import pad_sequence
 
-from oracle.constants import ZTF_sims_to_Astrophysical_mappings
-from oracle.custom_datasets.BTS import ZTF_passband_to_wavelengths, ZTF_wavelength_to_color
+from AD.constants import ZTF_sims_to_Astrophysical_mappings
+from AD.custom_datasets.BTS import ZTF_passband_to_wavelengths, ZTF_wavelength_to_color
 
 # Path to this file's directory
 here = Path(__file__).resolve().parent

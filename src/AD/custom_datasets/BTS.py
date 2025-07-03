@@ -12,7 +12,7 @@ from PIL import Image
 from tqdm import tqdm
 from torch.nn.utils.rnn import pad_sequence
 
-from oracle.constants import ztf_filters, ztf_alert_image_order, ztf_alert_image_dimension, ztf_filter_to_fid, BTS_to_Astrophysical_mappings
+from AD.constants import ztf_filters, ztf_alert_image_order, ztf_alert_image_dimension, ztf_filter_to_fid, BTS_to_Astrophysical_mappings
 
 # Path to this file's directory
 here = Path(__file__).resolve().parent

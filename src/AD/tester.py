@@ -10,7 +10,7 @@ from sklearn.metrics import classification_report
 from tqdm import tqdm
 from pathlib import Path    
 
-from oracle.visualization import plot_confusion_matrix, plot_roc_curves, plot_train_val_history, plot_class_wise_performance_over_all_phases, plot_average_performance_over_all_phases
+from AD.visualization import plot_confusion_matrix, plot_roc_curves, plot_train_val_history, plot_class_wise_performance_over_all_phases, plot_average_performance_over_all_phases
 
 class Tester:
     

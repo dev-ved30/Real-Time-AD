@@ -5,10 +5,10 @@ import argparse
 from pathlib import Path    
 from torch.utils.data import DataLoader, ConcatDataset
 
-from oracle.architectures import *
-from oracle.custom_datasets.ELAsTiCC import *
-from oracle.custom_datasets.BTS import *
-from oracle.custom_datasets.ZTF_sims import *
+from AD.architectures import *
+from AD.custom_datasets.ELAsTiCC import *
+from AD.custom_datasets.BTS import *
+from AD.custom_datasets.ZTF_sims import *
 
 # <----- Defaults for training the models ----->
 default_num_epochs = 100

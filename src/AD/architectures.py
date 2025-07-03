@@ -8,8 +8,8 @@ from torchvision.models import swin_v2_b
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 import torch.nn.functional as F
 
-from oracle.trainer import Trainer
-from oracle.tester import Tester
+from AD.trainer import Trainer
+from AD.tester import Tester
 
 swin_v2_b_output_dim = 1000
 
