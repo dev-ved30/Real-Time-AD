@@ -6,7 +6,6 @@ from pathlib import Path
 from torch.utils.data import DataLoader, ConcatDataset
 
 from AD.architectures import *
-from AD.custom_datasets.ELAsTiCC import *
 from AD.custom_datasets.BTS import *
 from AD.custom_datasets.ZTF_sims import *
 
@@ -15,12 +14,12 @@ default_num_epochs = 100
 default_batch_size = 1024
 default_learning_rate = 1e-5
 default_alpha = 0.0
-default_max_n_per_class = int(1e7)
+default_max_n_per_class = None
 default_model_dir = None
 
 # <----- Config for the model ----->
-model_choices = ["ORACLE1_ELAsTiCC", "ORACLE1-lite_ELAsTiCC", "ORACLE1-lite_BTS", "ORACLE1-lite_ZTFSims", "ORACLE1_BTS"]
-default_model_type = "ORACLE1_ELAsTiCC"
+model_choices = ["BTS", "BTS-lite", "BTS_full_lc", "ZTF_Sims-lite"]
+default_model_type = "BTS"
 
 # Switch device to GPU if available
 #device = "mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu"
@@ -35,13 +34,11 @@ def parse_args():
     Get commandline options
     '''
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model',choices=model_choices, default=default_model_type, help='Type of model to train.')
+    parser.add_argument('model', choices=model_choices, help='Type of model to train.')
     parser.add_argument('--num_epochs', type=int, default=default_num_epochs, help='Number of epochs to train the model for.')
     parser.add_argument('--batch_size', type=int, default=default_batch_size, help='Batch size used for training.')
     parser.add_argument('--lr', type=float, default=default_learning_rate, help='Learning rate used for training.')
-    parser.add_argument('--max_n_per_class', type=int, default=default_max_n_per_class, help='Maximum number of samples for any class. This allows for balancing of datasets. ')
-    parser.add_argument('--alpha', type=float, default=default_alpha, help='Alpha value used for the loss function. See Villar et al. (2024) for more information. [https://arxiv.org/abs/2312.02266]')
-    parser.add_argument('--dir', type=Path, default=default_model_dir, help='Directory for saving the models and best model during training.')
+    parser.add_argument('--max_n_per_class', type=int, default=default_max_n_per_class, help='Maximum number of samples for any class. This allows for balancing of datasets.')
     parser.add_argument('--load_weights', type=Path, default=None, help='Path to model which should be loaded before training stars.')
 
     args = parser.parse_args()
@@ -58,15 +55,13 @@ def get_wandb_run(args):
         # Set the wandb entity where your project will be logged (generally your team name).
         entity="vedshah-email-northwestern-university",
         # Set the wandb project where this run will be logged.
-        project="ORACLE",
+        project="AD",
         # Track hyperparameters and run metadata.
         config={
             "num_epochs": args.num_epochs,
             "batch_size": args.batch_size,
             "lr": args.lr,
             "max_n_per_class": args.max_n_per_class,
-            "alpha": args.alpha,
-            "model_dir": args.dir,
             "model_choice": args.model,
             "pretrained_model_path": args.load_weights,
         },
@@ -80,63 +75,16 @@ def run_training_loop(args):
     batch_size = args.batch_size
     lr = args.lr
     max_n_per_class = args.max_n_per_class
-    alpha = args.alpha
-    model_dir = args.dir
     model_choice = args.model
     pretrained_model_path = args.load_weights
-
-    if model_dir==None:
-        model_dir = Path(f'./models/{model_choice}')
-
-    # This is used to log data
-    wandb_run = get_wandb_run(args)
-
-    # Create the model directory if it does not exist   
-    model_dir.mkdir(parents=True, exist_ok=True)
-    save_args_to_csv(args, f'{model_dir}/train_args.csv')
 
     # Keep generator on the CPU
     generator = torch.Generator(device=device)
 
-    # Assign the taxonomy based on the choice
-    if model_choice == "ORACLE1_ELAsTiCC":
-        
-        # Define the model taxonomy and architecture
-        model = ORACLE1(19)
-
-        # Load the training set
-        train_dataset = ELAsTiCC_LC_Dataset(ELAsTiCC_train_parquet_path, include_lc_plots=False, transform=truncate_ELAsTiCC_light_curve_fractionally, max_n_per_class=max_n_per_class)
-        train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, collate_fn=custom_collate_ELAsTiCC, generator=generator)
-        
-        # Load the validation set
-        val_dataset = []
-        for f in val_truncation_fractions:
-            transform = partial(truncate_ELAsTiCC_light_curve_fractionally, f=f)
-            val_dataset.append(ELAsTiCC_LC_Dataset(ELAsTiCC_val_parquet_path, transform=transform))
-        concatenated_val_dataset = ConcatDataset(val_dataset)
-        val_dataloader = DataLoader(concatenated_val_dataset, batch_size=batch_size, shuffle=False, collate_fn=custom_collate_ELAsTiCC, generator=generator)
-
-    elif model_choice == "ORACLE1-lite_ELAsTiCC":
+    if model_choice == "BTS-lite":
 
         # Define the model taxonomy and architecture
-        model = ORACLE1_lite(19)
-
-        # Load the training set
-        train_dataset = ELAsTiCC_LC_Dataset(ELAsTiCC_train_parquet_path, include_lc_plots=False, transform=truncate_ELAsTiCC_light_curve_fractionally, max_n_per_class=max_n_per_class)
-        train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, collate_fn=custom_collate_ELAsTiCC, generator=generator)
-        
-        # Load the validation set
-        val_dataset = []
-        for f in val_truncation_fractions:
-            transform = partial(truncate_ELAsTiCC_light_curve_fractionally, f=f)
-            val_dataset.append(ELAsTiCC_LC_Dataset(ELAsTiCC_val_parquet_path, transform=transform))
-        concatenated_val_dataset = ConcatDataset(val_dataset)
-        val_dataloader = DataLoader(concatenated_val_dataset, batch_size=batch_size, shuffle=False, collate_fn=custom_collate_ELAsTiCC, generator=generator)
-
-    elif model_choice == "ORACLE1-lite_BTS":
-
-        # Define the model taxonomy and architecture
-        model = ORACLE1_lite(8)
+        model = GRU(8)
 
         # Load the training set
         train_dataset = BTS_LC_Dataset(BTS_train_parquet_path, max_n_per_class=max_n_per_class, transform=truncate_BTS_light_curve_by_days_since_trigger)
@@ -150,10 +98,10 @@ def run_training_loop(args):
         concatenated_val_dataset = ConcatDataset(val_dataset)
         val_dataloader = DataLoader(concatenated_val_dataset, batch_size=batch_size, shuffle=False, collate_fn=custom_collate_BTS, generator=generator)
 
-    elif model_choice == "ORACLE1_BTS":
+    elif model_choice == "BTS":
 
         # Define the model taxonomy and architecture
-        model = ORACLE1(8, static_feature_dim=17)
+        model = GRU_plus_MD(8, static_feature_dim=17)
 
         # Load the training set
         train_dataset = BTS_LC_Dataset(BTS_train_parquet_path, max_n_per_class=max_n_per_class, transform=truncate_BTS_light_curve_by_days_since_trigger)
@@ -167,11 +115,28 @@ def run_training_loop(args):
         concatenated_val_dataset = ConcatDataset(val_dataset)
         val_dataloader = DataLoader(concatenated_val_dataset, batch_size=batch_size, shuffle=False, collate_fn=custom_collate_BTS, generator=generator)
 
-
-    elif model_choice == "ORACLE1-lite_ZTFSims":
+    elif model_choice == "BTS_full_lc":
 
         # Define the model taxonomy and architecture
-        model = ORACLE1_lite(8)
+        model = GRU_plus_MD(8, static_feature_dim=17)
+
+        # Load the training set
+        train_dataset = BTS_LC_Dataset(BTS_train_parquet_path, max_n_per_class=max_n_per_class)
+        train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, collate_fn=custom_collate_BTS, generator=generator)
+
+        # Load the validation set
+        val_dataset = []
+        for f in [1]:
+            transform = partial(truncate_BTS_light_curve_fractionally, f=f)
+            val_dataset.append(BTS_LC_Dataset(BTS_val_parquet_path, transform=transform))
+        concatenated_val_dataset = ConcatDataset(val_dataset)
+        val_dataloader = DataLoader(concatenated_val_dataset, batch_size=batch_size, shuffle=False, collate_fn=custom_collate_BTS, generator=generator)
+
+
+    elif model_choice == "ZTF_Sims-lite":
+
+        # Define the model taxonomy and architecture
+        model = GRU(8)
 
         # Load the training set
         train_dataset = ZTF_SIM_LC_Dataset(ZTF_sim_train_parquet_path, include_lc_plots=False, transform=truncate_ZTF_SIM_light_curve_fractionally, max_n_per_class=max_n_per_class)
@@ -184,6 +149,14 @@ def run_training_loop(args):
             val_dataset.append(ZTF_SIM_LC_Dataset(ZTF_sim_val_parquet_path, transform=transform))
         concatenated_val_dataset = ConcatDataset(val_dataset)
         val_dataloader = DataLoader(concatenated_val_dataset, batch_size=batch_size, shuffle=False, collate_fn=custom_collate_ZTF_SIM, generator=generator)
+
+    # This is used to log data
+    wandb_run = get_wandb_run(args)
+    model_dir = Path(f'./models/{model_choice}/{wandb_run.name}')
+
+    # Create the model directory if it does not exist   
+    model_dir.mkdir(parents=True, exist_ok=True)
+    save_args_to_csv(args, f'{model_dir}/train_args.csv')
 
     # Load pretrained model
     if pretrained_model_path != None:

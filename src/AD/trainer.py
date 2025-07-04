@@ -53,18 +53,18 @@ class Trainer:
         self.device = device
         self.model_dir = model_dir
 
-        self.one_hot_encoder = OneHotEncoder()
+        # Create a one hot encoder and save it for use during testing
+        self.one_hot_encoder = OneHotEncoder(categories=[np.unique(train_labels)])
         self.one_hot_encoder.fit(np.asarray(train_labels).reshape(-1, 1))
         joblib.dump(self.one_hot_encoder, f'{model_dir}/encoder.pkl')
 
+        # Get the one hot encoding for all training and validation samples
         self.train_encodings = self.one_hot_encoder.transform(np.asarray(train_labels).reshape(-1, 1))
         self.val_encodings = self.one_hot_encoder.transform(np.asarray(val_labels).reshape(-1, 1))
 
         # Set up criterion for training and validation. These need to be different because the class weights can be different
         self.train_weights = get_loss_weights(self.train_encodings).to(device=self.device)
         self.val_weights = get_loss_weights(self.val_encodings).to(device=self.device)
-
-        print(self.train_weights, self.val_weights)
 
         self.train_criterion = CrossEntropyLoss(weight=self.train_weights)
         self.val_criterion = CrossEntropyLoss(weight=self.val_weights)
@@ -88,8 +88,8 @@ class Trainer:
 
             # Get the label encodings
             label_encodings = torch.from_numpy(
-                                                    self.one_hot_encoder.transform(np.asarray(batch['label']).reshape(-1, 1)).toarray()
-                                                ).to(device=self.device)           
+                                self.one_hot_encoder.transform(np.asarray(batch['label']).reshape(-1, 1)).toarray()
+                            ).to(device=self.device)           
 
             # Forward pass
             logits = self(batch)
@@ -118,11 +118,11 @@ class Trainer:
 
                 # Get the label encodings
                 label_encodings = torch.from_numpy(
-                                                    self.one_hot_encoder.transform(np.asarray(batch['label']).reshape(-1, 1)).toarray()
-                                                ).to(device=self.device)    
+                                    self.one_hot_encoder.transform(np.asarray(batch['label']).reshape(-1, 1)).toarray()
+                                ).to(device=self.device)    
+                
                 # Forward pass
                 logits = self(batch)
-
                 loss = self.val_criterion(logits, label_encodings)
                 val_loss_values.append(loss.item())
 
@@ -149,6 +149,7 @@ class Trainer:
         wandb.save(f"{self.model_dir}/val_loss_history.npy")
         wandb.save(f"{self.model_dir}/best_model.pth")
         wandb.save(f"{self.model_dir}/train_args.csv")
+        wandb.save(f"{self.model_dir}/encoder.pkl")
 
     def save_loss_history(self, train_loss_history, val_loss_history):
 
@@ -176,6 +177,7 @@ class Trainer:
             train_loss_history.append(train_loss)
             val_loss_history.append(val_loss)
 
+            # If the train loss is nan, something went wrong
             if np.isnan(train_loss) == True:
                 print("Training loss was nan. Exiting the loop.")
                 break

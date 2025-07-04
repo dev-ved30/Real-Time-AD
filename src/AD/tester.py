@@ -1,6 +1,5 @@
 import torch
 import joblib
-import umap
 
 import numpy as np
 import pandas as pd
@@ -10,7 +9,7 @@ from sklearn.metrics import classification_report
 from tqdm import tqdm
 from pathlib import Path    
 
-from AD.visualization import plot_confusion_matrix, plot_roc_curves, plot_train_val_history, plot_class_wise_performance_over_all_phases, plot_average_performance_over_all_phases
+from AD.visualization import plot_confusion_matrix, plot_roc_curves, plot_train_val_history, plot_class_wise_performance_over_all_phases, plot_average_performance_over_all_phases, plot_latent_space_umap
 
 class Tester:
     
@@ -33,10 +32,9 @@ class Tester:
     def create_metric_phase_plots(self):
         
         for metric in ['f1-score','precision','recall']:
-            metrics_dictionary = self.get_metric_over_all_phases(metric)
-            plot_class_wise_performance_over_all_phases(metric, metrics_dictionary, self.model_dir)
-            plot_average_performance_over_all_phases(metric, metrics_dictionary, self.model_dir)
-
+            df = self.get_metric_over_all_phases(metric)
+            plot_class_wise_performance_over_all_phases(metric, df, self.model_dir)
+            plot_average_performance_over_all_phases(metric, df, self.model_dir)
 
     def create_classification_report(self, y_true, y_pred, file_name=None):
         
@@ -57,51 +55,22 @@ class Tester:
         # Make sure metric is valid
         assert metric in ['f1-score','precision','recall']
 
-        metrics_dictionary = {}
+        reports_dir = Path(f"{self.model_dir}/reports/")
+        reports = list(reports_dir.glob("*.csv"))
+        reports.sort()
+        
+        day_wise_metrics = []
 
-        for depth in nodes_by_depth:
+        for report in reports:
 
-            if depth != 0:
+            day = int(str(report).split("+")[1].split('.')[0])
+            df = pd.read_csv(report, index_col='Class')[[metric]]
+            df = df.rename(columns={metric:day})
+            day_wise_metrics.append(df)
 
-                reports_dir = Path(f"{self.model_dir}/reports/depth{depth}/")
-                reports = list(reports_dir.glob("*.csv"))
-                reports.sort()
-                
-                day_wise_metrics = []
-
-                for report in reports:
-
-                    day = int(str(report).split("+")[1].split('.')[0])
-                    df = pd.read_csv(report, index_col='Class')[[metric]]
-                    df = df.rename(columns={metric:day})
-                    day_wise_metrics.append(df)
-
-                combined_df = pd.concat(day_wise_metrics, axis=1, join='inner')
-                combined_df = combined_df.reindex(sorted(combined_df.columns), axis=1)
-                metrics_dictionary[depth] = combined_df
-
-        return metrics_dictionary
-    
-    def get_umap_of_latent_space(self, embeddings):
-
-        reducer = umap.UMAP()
-        umap_embedding = reducer.fit_transform(embeddings.to_numpy())
-        return umap_embedding
-    
-    def save_umap_plot(self, umap_embedding, trues, title, file):
-
-        plt.close('all')
-        plt.style.use(['default'])
-
-        for c in np.unique(trues):
-
-            idx = np.where(np.asarray(trues)==c)
-            plt.scatter(umap_embedding[idx,0], umap_embedding[idx,1], label=c)
-
-        plt.legend()
-        plt.title(title)
-        plt.savefig(file)
-        plt.close()
+        combined_df = pd.concat(day_wise_metrics, axis=1, join='inner')
+        combined_df = combined_df.reindex(sorted(combined_df.columns), axis=1)
+        return combined_df
 
     def run_all_analysis(self, test_loader, d):
 
@@ -122,63 +91,53 @@ class Tester:
 
             # Run inference and get the predictions df
             pred_df = self.predict_conditional_probabilities_df(batch)
-            embeddings = self.get_latent_space_embeddings(batch).detach()
-            embeddings = pd.DataFrame(embeddings)
-            combined_embeddings.append(embeddings)
+            embeddings = pd.DataFrame(self.get_latent_space_embeddings(batch).detach())
 
             # Make dataframe for true labels
             true_df = self.one_hot_encoder.transform(np.asarray(batch['label']).reshape(-1, 1)).toarray()
             true_df = pd.DataFrame(true_df, columns=pred_df.columns)
 
+            # Maintain list across all batches
             true_classes += batch['label'].tolist()
             combined_pred_df.append(pred_df)
             combined_true_df.append(true_df)
+            combined_embeddings.append(embeddings)
         
         true_classes = np.array(true_classes)
         combined_pred_df = pd.concat(combined_pred_df, ignore_index=True)
         combined_true_df = pd.concat(combined_true_df, ignore_index=True)
         combined_embeddings = pd.concat(combined_embeddings, ignore_index=True)
-        u_map_embeddings = self.get_umap_of_latent_space(combined_embeddings)
-
 
         # Make dirs for plots and reports
-        Path(f"{self.model_dir}/plots/depthleaf").mkdir(parents=True, exist_ok=True)
-        Path(f"{self.model_dir}/reports/depthleaf").mkdir(parents=True, exist_ok=True)
-
-        nodes_by_depth = {
-            'leaf': combined_pred_df.columns
-        }
-        depth = 'leaf'
+        Path(f"{self.model_dir}/plots/").mkdir(parents=True, exist_ok=True)
+        Path(f"{self.model_dir}/reports/").mkdir(parents=True, exist_ok=True)
 
         # Get all the nodes at depth 
-        nodes = nodes_by_depth[depth]
-
-        # Only select the classes at the appropriate depth
-        level_pred_df = combined_pred_df
-        level_pred_classes = nodes[np.argmax(level_pred_df.to_numpy(), axis=1)]
-
-        level_true_df = combined_true_df
-        level_true_classes = nodes[np.argmax(level_true_df.to_numpy(), axis=1)]
+        classes = np.asarray(self.one_hot_encoder.categories_[0])
+        pred_classes = classes[np.argmax(combined_pred_df.to_numpy(), axis=1)]
+        true_classes = classes[np.argmax(combined_true_df.to_numpy(), axis=1)]
         
-        # Make the confusion matrix plot
-        cf_title = f"Trigger+{d} days"
-        cf_img_file = f"{self.model_dir}/plots/depth{depth}/cf_trigger+{d}.pdf"
-        plot_confusion_matrix(np.array(level_true_classes), np.array(level_pred_classes), nodes, title=cf_title, img_file=cf_img_file)
+        title = f"Trigger+{d} days"
 
-        umap_title = f"Trigger+{d} days"
-        umap_img_file = f"{self.model_dir}/plots/depth{depth}/umap_trigger+{d}.pdf"
-        self.save_umap_plot(u_map_embeddings, true_classes, umap_title, umap_img_file)
+        # Make the confusion matrix plot
+        Path(f"{self.model_dir}/plots/cf").mkdir(parents=True, exist_ok=True)
+        cf_img_file = f"{self.model_dir}/plots/cf/cf_trigger+{d}.pdf"
+        plot_confusion_matrix(np.array(true_classes), np.array(pred_classes), classes, title=title, file=cf_img_file)
+
+        # Make the umap plots
+        Path(f"{self.model_dir}/plots/umap").mkdir(parents=True, exist_ok=True)
+        umap_img_file = f"{self.model_dir}/plots/umap/umap_trigger+{d}.pdf"
+        plot_latent_space_umap(combined_embeddings, true_classes, title, umap_img_file)
 
         # Make the ROC plot
-        roc_title = f"Trigger+{d} days"
-        roc_img_file = f"{self.model_dir}/plots/depth{depth}/roc_trigger+{d}.pdf"
-        plot_roc_curves(level_true_df.to_numpy(), level_pred_df.to_numpy(), nodes, title=roc_title, img_file=roc_img_file)
+        Path(f"{self.model_dir}/plots/roc").mkdir(parents=True, exist_ok=True)
+        roc_img_file = f"{self.model_dir}/plots/roc/roc_trigger+{d}.pdf"
+        plot_roc_curves(combined_true_df.to_numpy(), combined_pred_df.to_numpy(), classes, title=title, file=roc_img_file)
 
         
-
         # Make classification report
-        report_file = f"{self.model_dir}/reports/depth{depth}/report_trigger+{d}.csv"
-        report = self.create_classification_report(np.array(level_true_classes), np.array(level_pred_classes), report_file)
+        report_file = f"{self.model_dir}/reports/report_trigger+{d}.csv"
+        report = self.create_classification_report(np.array(true_classes), np.array(pred_classes), report_file)
         print(report)
 
 

@@ -8,14 +8,12 @@ from pathlib import Path
 from torch.utils.data import DataLoader
 
 from AD.architectures import *
-from AD.custom_datasets.ELAsTiCC import *
 from AD.custom_datasets.BTS import *
 from AD.custom_datasets.ZTF_sims import *
 
 # <----- Defaults for training the models ----->
 default_batch_size = 1024
-default_max_n_per_class = int(1e7)
-default_model_dir = None
+default_max_n_per_class = None
 defaults_days_list = 2 ** np.array(range(11))
 
 # Switch device to GPU if available
@@ -29,7 +27,7 @@ def parse_args():
     Get commandline options
     '''
     parser = argparse.ArgumentParser()
-    parser.add_argument('--dir', type=Path, required=True, help='Directory for saved model.')
+    parser.add_argument('dir', type=Path, help='Directory for saved model.')
     parser.add_argument('--batch_size', type=int, default=default_batch_size, help='Batch size used for test.')
     parser.add_argument('--max_n_per_class', type=int, default=default_max_n_per_class, help='Maximum number of samples for any class. This allows for balancing of datasets.')
     args = parser.parse_args()
@@ -52,67 +50,11 @@ def run_testing_loop(args):
     # Keep generator on the CPU
     generator = torch.Generator(device=device)
 
-    # Assign the taxonomy based on the choice
-    if model_choice == "ORACLE1_ELAsTiCC":
-        
-        # Define the model taxonomy and architecture and load model weights
-        model = ORACLE1(19)
-        model.load_state_dict(torch.load(f'{model_dir}/best_model.pth', map_location=device))
+    if model_choice == "BTS-lite":
 
-        # Set up testing
-        model = model.to(device)
-        model.setup_testing(model_dir, device)
-
-        # Load the dataset
-        test_dataset = ELAsTiCC_LC_Dataset(ELAsTiCC_test_parquet_path, include_lc_plots=False, max_n_per_class=max_n_per_class)
-
-        for d in defaults_days_list:
-            
-            # Set the transform and create dataloader
-            test_dataset.transform = partial(truncate_ELAsTiCC_light_curve_by_days_since_trigger, d=d)
-            test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True, collate_fn=custom_collate_ELAsTiCC, generator=generator)
-
-            model.run_all_analysis(test_dataloader, d)
-
-    elif model_choice == "ORACLE1-lite_ELAsTiCC":
-
-        model = ORACLE1_lite(19)
-        model.load_state_dict(torch.load(f'{model_dir}/best_model.pth', map_location=device))
-
-        # Set up testing
-        model = model.to(device)
-        model.setup_testing(model_dir, device)
-
-        # Load the dataset
-        test_dataset = ELAsTiCC_LC_Dataset(ELAsTiCC_test_parquet_path, include_lc_plots=False, max_n_per_class=max_n_per_class)
-
-        for d in defaults_days_list:
-            
-            # Set the transform and create dataloader
-            test_dataset.transform = partial(truncate_ELAsTiCC_light_curve_by_days_since_trigger, d=d)
-            test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True, collate_fn=custom_collate_ELAsTiCC, generator=generator)
-
-            model.run_all_analysis(test_dataloader, d)
-
-    elif model_choice == "ORACLE1-lite_BTS":
-
-        # Define the model taxonomy and architecture
-        model = ORACLE1_lite(8)
-        ckpt = torch.load(f'{model_dir}/best_model.pth', map_location=device)
-
-        # If you saved a dict containing multiple things:
-        if isinstance(ckpt, dict) and 'model_state_dict' in ckpt:
-            state_dict = ckpt['model_state_dict']
-        else:
-            state_dict = ckpt
-
-        # Keep only parameters that belong to the model
-        filtered_state = {
-            k: v for k, v in state_dict.items()
-            if k in model.state_dict()
-        }
-
-        model.load_state_dict(filtered_state)
+        # Define the model architecture
+        model = GRU(8)
+        model.load_state_dict(torch.load(f'{model_dir}/best_model.pth', map_location=device), strict=False)
 
         # Set up testing
         model = model.to(device)
@@ -129,25 +71,11 @@ def run_testing_loop(args):
 
             model.run_all_analysis(test_dataloader, d)
 
-    elif model_choice == "ORACLE1_BTS":
+    elif model_choice == "BTS":
 
-        # Define the model taxonomy and architecture
-        model = ORACLE1(8, static_feature_dim=17)
-        ckpt = torch.load(f'{model_dir}/best_model.pth', map_location=device)
-
-        # If you saved a dict containing multiple things:
-        if isinstance(ckpt, dict) and 'model_state_dict' in ckpt:
-            state_dict = ckpt['model_state_dict']
-        else:
-            state_dict = ckpt
-
-        # Keep only parameters that belong to the model
-        filtered_state = {
-            k: v for k, v in state_dict.items()
-            if k in model.state_dict()
-        }
-
-        model.load_state_dict(filtered_state)
+        # Define the model architecture
+        model = GRU_plus_MD(8, static_feature_dim=17)
+        model.load_state_dict(torch.load(f'{model_dir}/best_model.pth', map_location=device), strict=False)
 
         # Set up testing
         model = model.to(device)
@@ -164,13 +92,31 @@ def run_testing_loop(args):
 
             model.run_all_analysis(test_dataloader, d)
 
-    elif model_choice == "ORACLE1-lite_ZTFSims":
+    elif model_choice == "BTS_full_lc":
 
-        # Define the model taxonomy and architecture
-        model = ORACLE1_lite(8)
+        # Define the model architecture
+        model = GRU_plus_MD(8, static_feature_dim=17)
+        model.load_state_dict(torch.load(f'{model_dir}/best_model.pth', map_location=device), strict=False)
 
-        # Define the model taxonomy and architecture
-        model = ORACLE1_lite(8)
+        # Set up testing
+        model = model.to(device)
+        model.setup_testing(model_dir, device)
+
+        # Load the training set
+        test_dataset = BTS_LC_Dataset(BTS_test_parquet_path, include_lc_plots=False, max_n_per_class=max_n_per_class)
+
+        for d in defaults_days_list:
+            
+            # Set the custom transform and reate dataloader
+            test_dataset.transform = partial(truncate_BTS_light_curve_by_days_since_trigger, d=d)
+            test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True, collate_fn=custom_collate_BTS, generator=generator)
+
+            model.run_all_analysis(test_dataloader, d)
+
+    elif model_choice == "ZTF_Sims-lite":
+
+        # Define the model architecture
+        model = GRU(8)
         model.load_state_dict(torch.load(f'{model_dir}/best_model.pth', map_location=device), strict=False)
 
         # Set up testing
@@ -189,7 +135,7 @@ def run_testing_loop(args):
             model.run_all_analysis(test_dataloader, d)
 
     model.create_loss_history_plot()
-    #model.create_metric_phase_plots()
+    model.create_metric_phase_plots()
 
 
 def main():

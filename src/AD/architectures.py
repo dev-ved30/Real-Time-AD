@@ -14,17 +14,16 @@ from AD.tester import Tester
 swin_v2_b_output_dim = 1000
 
 # Template for the Hierarchical Classifier
-class Hierarchical_classifier(nn.Module, Trainer, Tester):
+class Classifier(nn.Module, Trainer, Tester):
 
-    def __init__(self, output_dim):
+    def __init__(self):
 
         nn.Module.__init__(self)
-        self.n_nodes = output_dim
 
     def predict_conditional_probabilities(self, batch):
         
         logits = self.forward(batch)
-        conditional_probabilities = F.softmax(logits).detach()
+        conditional_probabilities = F.softmax(logits, dim=-1).detach()
         return conditional_probabilities
     
     def predict_conditional_probabilities_df(self, batch):
@@ -37,99 +36,16 @@ class Hierarchical_classifier(nn.Module, Trainer, Tester):
     def get_latent_space_embeddings(self, batch):
 
         raise NotImplementedError
-    
-# Base version of the classifier which only uses the Light curve image
-class ORACLE2_lite_swin(Hierarchical_classifier):
-        
-    def __init__(self, output_dim):
+     
+class GRU_plus_MD(Classifier):
 
-        super(ORACLE2_lite_swin, self).__init__(output_dim)
+    def __init__(self, output_dim, ts_feature_dim=5, static_feature_dim=18):
 
-        # TODO: Think about what weights we want to initialize the transformer with.
-        self.swin = torch.hub.load("pytorch/vision", "swin_v2_t", weights="DEFAULT", progress=False)
+        super(GRU_plus_MD, self).__init__()
 
-        # Make sure all parameters in Swin are trainable
-        for param in self.swin.parameters():
-            param.requires_grad = True
-
-        # Additional layers for classification
-        self.fc = nn.Sequential(
-            nn.Linear(1000, 512),
-            nn.ReLU(True),
-            nn.Dropout(0.3),
-            nn.Linear(512, 256),
-            nn.ReLU(True),
-            nn.Dropout(0.3),
-            nn.Linear(256, 128),
-            nn.ReLU(True),
-            nn.Dropout(0.3),
-            nn.Linear(128, 64),
-            nn.ReLU(True),
-            nn.Dropout(0.3),
-            nn.Linear(64, self.n_nodes),
-        )
-    
-    def forward(self, batch):
-        
-        swin_output = self.swin(batch['lc_plot'])
-        logits = self.fc(swin_output)
-        return logits
-
-class ORACLE2_pro_swin(Hierarchical_classifier):
-
-    def __init__(self, output_dim):
-
-        super(ORACLE2_pro_swin, self).__init__(output_dim)
-
-
-        # TODO: Think about what weights we want to initialize the transformer with.
-        self.swin_lc = torch.hub.load("pytorch/vision", "swin_v2_t", weights="DEFAULT", progress=False)
-
-        # Make sure all parameters in Swin are trainable
-        for param in self.swin_lc.parameters():
-            param.requires_grad = True
-
-        # TODO: Think about what weights we want to initialize the transformer with.
-        self.swin_postage = torch.hub.load("pytorch/vision", "swin_v2_t", weights="DEFAULT", progress=False)
-
-        # Make sure all parameters in Swin are trainable
-        for param in self.swin_postage.parameters():
-            param.requires_grad = True
-
-        # Additional layers for classification
-        self.fc = nn.Sequential(
-            nn.Linear(2000, 512),
-            nn.ReLU(True),
-            nn.Dropout(0.3),
-            nn.Linear(512, 256),
-            nn.ReLU(True),
-            nn.Dropout(0.3),
-            nn.Linear(256, 128),
-            nn.ReLU(True),
-            nn.Dropout(0.3),
-            nn.Linear(128, 64),
-            nn.ReLU(True),
-            nn.Dropout(0.3),
-            nn.Linear(64, self.n_nodes),
-        )
-
-    def forward(self, batch):
-        
-        swin_lc_output = self.swin_lc(batch['lc_plot'])
-        swin_postage_output = self.swin_lc(batch['postage_stamp'])
-        combined_output = torch.concat((swin_lc_output, swin_postage_output), dim=1)
-        logits = self.fc(combined_output)
-        return logits
-    
-class ORACLE1(Hierarchical_classifier):
-
-    def __init__(self, output_dim,  ts_feature_dim=5, latent_space_dim=64, static_feature_dim=18):
-
-        super(ORACLE1, self).__init__(output_dim)
-
-        self.latent_space_dim = latent_space_dim
         self.ts_feature_dim = ts_feature_dim
         self.static_feature_dim = static_feature_dim
+        self.output_dim = output_dim
 
         # recurrent backbone
         self.gru = nn.GRU(input_size=ts_feature_dim, hidden_size=100, num_layers=2, batch_first=True)
@@ -142,14 +58,14 @@ class ORACLE1(Hierarchical_classifier):
 
         # merge & head
         self.dense3 = nn.Linear(100 + 10, 100)
-        self.dense4 = nn.Linear(100, self.latent_space_dim)
+        self.dense4 = nn.Linear(100, 64)
 
-        self.fc_out = nn.Linear(self.latent_space_dim, self.n_nodes)
+        self.fc_out = nn.Linear(64, self.output_dim)
 
         self.tanh = nn.Tanh()
         self.relu = nn.ReLU()
-
-    def forward(self, batch):
+    
+    def get_latent_space_embeddings(self, batch):
 
         x_ts = batch['ts'] # (batch_size, seq_len, n_ts_features)
         lengths = batch['length'] # (batch_size)
@@ -178,41 +94,28 @@ class ORACLE1(Hierarchical_classifier):
         x = self.dense3(x)
         x = self.relu(x)
         x = self.dense4(x)
+
+        return x
+    
+    def forward(self, batch):
+        
+        # Get the latent space embedding
+        x = self.get_latent_space_embeddings(batch)
+
+        # Final step to produce logits
         x = self.relu(x)
         logits = self.fc_out(x)
 
         return logits
-    
-    def get_latent_space_embeddings(self, batch):
 
-        embeddings = {}
+class GRU(Classifier):
 
-        def save_latent(module, inp, out):
-            # out is the dense4 output
-            embeddings['latent'] = out.detach()
+    def __init__(self, output_dim, ts_feature_dim=5):
 
-        # register hook
-        hook_handle = self.dense4.register_forward_hook(save_latent)
+        super(GRU,  self).__init__()
 
-        # run your forward
-        with torch.no_grad():
-            preds = self.forward(batch)
-
-        # now embeddings['latent'] holds the (batch, latent_space_dim) tensor
-        latent_vectors = embeddings['latent']
-
-        # when done, remove the hook to avoid memory leaks
-        hook_handle.remove()
-        return latent_vectors
-
-class ORACLE1_lite(Hierarchical_classifier):
-
-    def __init__(self, output_dim, ts_feature_dim=5, latent_space_dim=64):
-
-        super(ORACLE1_lite,  self).__init__(output_dim)
-
-        self.latent_space_dim = latent_space_dim
         self.ts_feature_dim = ts_feature_dim
+        self.output_dim = output_dim
 
         # recurrent backbone
         self.gru = nn.GRU(input_size=ts_feature_dim, hidden_size=100, num_layers=2, batch_first=True)
@@ -221,14 +124,14 @@ class ORACLE1_lite(Hierarchical_classifier):
         self.dense1 = nn.Linear(100, 100)
 
         # merge & head
-        self.dense2 = nn.Linear(100, self.latent_space_dim)
+        self.dense2 = nn.Linear(100, 64)
 
-        self.fc_out = nn.Linear(self.latent_space_dim, self.n_nodes)
+        self.fc_out = nn.Linear(64, self.output_dim)
 
         self.tanh = nn.Tanh()
         self.relu = nn.ReLU()
 
-    def forward(self, batch):
+    def get_latent_space_embeddings(self, batch):
 
         x_ts = batch['ts'] # (batch_size, seq_len, n_ts_features)
         lengths = batch['length'] # (batch_size)
@@ -249,6 +152,14 @@ class ORACLE1_lite(Hierarchical_classifier):
 
         # Merge & head
         x = self.dense2(dense1)
+        return x
+
+    def forward(self, batch):
+
+        # Get the latent space embedding
+        x = self.get_latent_space_embeddings(batch)
+
+        # Final step to produce logits
         x = self.relu(x)
         logits = self.fc_out(x)
 
@@ -275,22 +186,4 @@ class ORACLE1_lite(Hierarchical_classifier):
         # when done, remove the hook to avoid memory leaks
         hook_handle.remove()
         return latent_vectors
-
-if __name__ == '__main__':
-
-    config = {
-        "layer1_neurons": 512,
-        "layer1_dropout": 0.3,
-        "layer2_neurons": 128,
-        "layer2_dropout": 0.2,
-    }
     
-    model = ORACLE2_lite_swin(config, 6)
-    model.eval()
-
-    x = torch.rand(10, 3, 256, 256)
-
-    print(model.predict_conditional_probabilities_df(x))
-    print(model.predict_class_probabilities_df(x))
-
-    print(model.state_dict())

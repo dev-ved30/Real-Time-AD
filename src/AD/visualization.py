@@ -1,16 +1,14 @@
-import networkx as nx
-import pandas as pd
+import umap
+
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.animation as animation
-import matplotlib.patches as mpatches
 
 from sklearn.calibration import calibration_curve
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, roc_curve, roc_auc_score
 
 cm = plt.get_cmap('gist_rainbow')
 
-def plot_confusion_matrix(y_true, y_pred, labels, title=None, img_file=None):
+def plot_confusion_matrix(y_true, y_pred, labels, title=None, file=None):
 
     plt.close('all')
     plt.style.use(['default'])
@@ -55,12 +53,12 @@ def plot_confusion_matrix(y_true, y_pred, labels, title=None, img_file=None):
     
     plt.tight_layout()
 
-    if img_file:
-        plt.savefig(img_file)
+    if file:
+        plt.savefig(file)
 
     plt.close()
 
-def plot_roc_curves(probs_true, probs_pred, labels, title=None, img_file=None):
+def plot_roc_curves(probs_true, probs_pred, labels, title=None, file=None):
 
     plt.close('all')
     plt.style.use(['default'])
@@ -109,13 +107,16 @@ def plot_roc_curves(probs_true, probs_pred, labels, title=None, img_file=None):
     plt.tight_layout()
     plt.gca().set_aspect('equal')
 
-    if img_file:
-        plt.savefig(img_file)
+    if file:
+        plt.savefig(file)
 
     plt.close()
 
 
-def plot_train_val_history(train_loss_history, val_loss_history, file_name):
+def plot_train_val_history(train_loss_history, val_loss_history, file=None):
+
+    plt.close('all')
+    plt.style.use(['default'])
 
     window_size = 10
 
@@ -134,75 +135,67 @@ def plot_train_val_history(train_loss_history, val_loss_history, file_name):
     axs[0].plot(list(range(len(train_loss_history))), np.log(train_loss_history), label='Train Loss', color='C0', alpha=0.5)
     axs[0].plot(s, np.log(rolling_train), label='Rolling Avg Train Loss', color='C1')
 
-    # axs[0].set_ylabel("Mean log loss", fontsize='x-large')
-    # axs[0].legend()
+    axs[0].set_ylabel("Mean log loss", fontsize='x-large')
+    axs[0].legend()
     axs[0].set_xticks([])
 
     axs[1].plot(list(range(len(val_loss_history))), np.log(val_loss_history), label='Validation Loss', color='C0', alpha=0.5)
     axs[1].plot(s, np.log(rolling_val), label='Rolling Avg Validation Loss', color='C1')
 
-    # axs[1].set_xlabel("Epoch", fontsize='x-large')
-    # axs[1].set_ylabel("Mean log loss", fontsize='x-large')
-    # axs[1].legend()
+    axs[1].set_xlabel("Epoch", fontsize='x-large')
+    axs[1].set_ylabel("Mean log loss", fontsize='x-large')
+    axs[1].legend()
 
     # axs[0].set_ylim(-3.4, -1)
     # axs[1].set_ylim(-3.4, -1)
 
-    plt.savefig(file_name)
+    if file != None:
+        plt.savefig(file)
+    else:
+        plt.show()
+
     plt.close()
 
-
-def plot_class_wise_performance_over_all_phases(metric, metrics_dictionary, model_dir=None):
-
-    plt.close('all')
-    plt.style.use(['default'])
-
-    for depth in metrics_dictionary:
-
-        df = metrics_dictionary[depth]
-
-        for c, row in df.iterrows():
-
-            if c not in ['accuracy','macro avg','weighted avg']:
-
-                days, value = row.index, row.values
-
-                plt.plot(days, value, label=c, marker = 'o')
-
-        plt.xlabel("Days from first detection", fontsize='xx-large')
-        plt.ylabel(f"{metric}", fontsize='xx-large')
-
-        plt.grid()
-        plt.tight_layout()
-        plt.legend(loc='lower right')
-        plt.xscale('log')
-        plt.xticks(days, days)
-
-        if model_dir == None:
-            plt.show()
-        else:
-            plt.savefig(f"{model_dir}/plots/depth{depth}/class_wise_{metric}.pdf")
-
-        plt.close()
-
-
-
-def plot_average_performance_over_all_phases(metric, metrics_dictionary, model_dir=None):
+def plot_class_wise_performance_over_all_phases(metric, df, model_dir=None):
 
     plt.close('all')
     plt.style.use(['default'])
 
-    for depth in metrics_dictionary:
+    for c, row in df.iterrows():
 
-        df = metrics_dictionary[depth]
+        if c not in ['accuracy','macro avg','weighted avg']:
 
-        for c, row in df.iterrows():
+            days, value = row.index, row.values
 
-            if c in ['macro avg','weighted avg']:
+            plt.plot(days, value, label=c, marker = 'o')
 
-                days, value = row.index, row.values
+    plt.xlabel("Days from first detection", fontsize='xx-large')
+    plt.ylabel(f"{metric}", fontsize='xx-large')
 
-                plt.plot(days, value, label=f"{c}(Depth={depth})", marker = 'o')
+    plt.grid()
+    plt.tight_layout()
+    plt.legend(loc='lower right')
+    plt.xscale('log')
+    plt.xticks(days, days)
+
+    if model_dir == None:
+        plt.show()
+    else:
+        plt.savefig(f"{model_dir}/plots/class_wise_{metric}.pdf")
+
+    plt.close()
+
+def plot_average_performance_over_all_phases(metric, df, model_dir=None):
+
+    plt.close('all')
+    plt.style.use(['default'])
+
+    for c, row in df.iterrows():
+
+        if c in ['macro avg','weighted avg']:
+
+            days, value = row.index, row.values
+            plt.plot(days, value, marker='o', label=c)
 
     plt.xlabel("Days from first detection", fontsize='xx-large')
     plt.ylabel(f"{metric}", fontsize='xx-large')
@@ -218,4 +211,43 @@ def plot_average_performance_over_all_phases(metric, metrics_dictionary, model_d
     else:
         plt.savefig(f"{model_dir}/plots/average_{metric}.pdf")
 
+    plt.close()
+
+def plot_latent_space_umap(embeddings, true_classes, title=None, file=None):
+
+    plt.close('all')
+    plt.style.use(['default'])
+
+    def get_umap_of_latent_space(embeddings):
+
+        reducer = umap.UMAP(random_state=42)
+        umap_embedding = reducer.fit_transform(embeddings.to_numpy())
+        return umap_embedding
+    
+    # Get the umap embeddings
+    umap_embedding = get_umap_of_latent_space(embeddings)
+    
+    # plot by class
+    for c in np.unique(true_classes):
+
+        idx = np.where(np.asarray(true_classes)==c)[0]
+        plt.scatter(umap_embedding[idx,0], umap_embedding[idx,1], label=c, marker='.')
+
+    plt.legend(loc='upper center', bbox_to_anchor=(0.5, -0.15), fancybox=True, shadow=False, ncol=2, fontsize = 12)
+    
+    plt.xlabel('UMAP 1')
+    plt.ylabel('UMAP 2')
+
+    plt.tight_layout()
+
+    # Add title if necessary
+    if title != None:
+        plt.title(title)
+
+    # If file path is provided, save it, or show 
+    if file != None:
+        plt.savefig(file)
+    else:
+        plt.show()
+    
     plt.close()
