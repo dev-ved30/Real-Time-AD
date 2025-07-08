@@ -53,7 +53,7 @@ def run_testing_loop(args):
     if model_choice == "BTS-lite":
 
         # Define the model architecture
-        model = GRU(8)
+        model = GRU(6)
         model.load_state_dict(torch.load(f'{model_dir}/best_model.pth', map_location=device), strict=False)
 
         # Set up testing
@@ -74,7 +74,7 @@ def run_testing_loop(args):
     elif model_choice == "BTS":
 
         # Define the model architecture
-        model = GRU_plus_MD(8, static_feature_dim=17)
+        model = GRU_plus_MD(6, static_feature_dim=17)
         model.load_state_dict(torch.load(f'{model_dir}/best_model.pth', map_location=device), strict=False)
 
         # Set up testing
@@ -82,7 +82,7 @@ def run_testing_loop(args):
         model.setup_testing(model_dir, device)
 
         # Load the training set
-        test_dataset = BTS_LC_Dataset(BTS_test_parquet_path, include_lc_plots=False, max_n_per_class=max_n_per_class)
+        test_dataset = BTS_LC_Dataset(BTS_test_parquet_path, include_lc_plots=False, max_n_per_class=max_n_per_class, excluded_classes=['Anomaly'])
 
         for d in defaults_days_list:
             
@@ -95,7 +95,7 @@ def run_testing_loop(args):
     elif model_choice == "BTS_full_lc":
 
         # Define the model architecture
-        model = GRU_plus_MD(8, static_feature_dim=17)
+        model = GRU_plus_MD(6, static_feature_dim=17)
         model.load_state_dict(torch.load(f'{model_dir}/best_model.pth', map_location=device), strict=False)
 
         # Set up testing
@@ -116,7 +116,7 @@ def run_testing_loop(args):
     elif model_choice == "ZTF_Sims-lite":
 
         # Define the model architecture
-        model = GRU(8)
+        model = GRU(6)
         model.load_state_dict(torch.load(f'{model_dir}/best_model.pth', map_location=device), strict=False)
 
         # Set up testing

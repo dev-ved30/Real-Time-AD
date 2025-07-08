@@ -71,24 +71,27 @@ n_book_keeping_features = len(book_keeping_feature_list)
 
 class BTS_LC_Dataset(torch.utils.data.Dataset):
 
-    def __init__(self, parquet_file_path,  max_n_per_class=None, include_postage_stamps=False, include_lc_plots=False, transform=None, over_sample=False):
+    def __init__(self, parquet_file_path,  max_n_per_class=None, include_postage_stamps=False, include_lc_plots=False, transform=None, over_sample=False, excluded_classes=[]):
         super(BTS_LC_Dataset, self).__init__()
 
-        # Columns to be read from the parquet file
         self.parquet_file_path = parquet_file_path
         self.transform = transform
         self.include_lc_plots = include_lc_plots
         self.include_postage_stamps = include_postage_stamps
         self.max_n_per_class = max_n_per_class
         self.over_sample = over_sample
+        self.excluded_classes = excluded_classes
 
         print(f'Loading dataset from {self.parquet_file_path}\n')
         self.parquet_df = pl.read_parquet(self.parquet_file_path)
+
+        # Columns to be read from the parquet file
         self.columns_dtypes = self.parquet_df.schema
 
         self.print_dataset_composition()
         self.convert_mags_to_flux()
         self.clean_up_dataset()
+        self.exclude_classes()
 
         if self.max_n_per_class != None:
             self.limit_max_samples_per_class()
@@ -155,6 +158,21 @@ class BTS_LC_Dataset(torch.utils.data.Dataset):
         
         return dictionary
     
+    def exclude_classes(self):
+
+        print(f"Excluding {self.excluded_classes} from the dataset...")
+
+        class_dfs = []
+        unique_classes = np.unique(self.parquet_df['class'])
+
+        for c in unique_classes:
+
+            if c not in self.excluded_classes:
+                class_df = self.parquet_df.filter(pl.col("class") == c)
+                class_dfs.append(class_df)
+
+        self.parquet_df = pl.concat(class_dfs)
+
     def print_dataset_composition(self):
         
         print("Before transforms and mappings, the dataset contains...")

@@ -84,51 +84,51 @@ def run_training_loop(args):
     if model_choice == "BTS-lite":
 
         # Define the model taxonomy and architecture
-        model = GRU(8)
+        model = GRU(6)
 
         # Load the training set
-        train_dataset = BTS_LC_Dataset(BTS_train_parquet_path, max_n_per_class=max_n_per_class, transform=truncate_BTS_light_curve_by_days_since_trigger)
+        train_dataset = BTS_LC_Dataset(BTS_train_parquet_path, max_n_per_class=max_n_per_class, transform=truncate_BTS_light_curve_by_days_since_trigger, excluded_classes=['Anomaly'])
         train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, collate_fn=custom_collate_BTS, generator=generator)
 
         # Load the validation set
         val_dataset = []
         for f in val_truncation_fractions:
             transform = partial(truncate_BTS_light_curve_fractionally, f=f)
-            val_dataset.append(BTS_LC_Dataset(BTS_val_parquet_path, transform=transform))
+            val_dataset.append(BTS_LC_Dataset(BTS_val_parquet_path, transform=transform, excluded_classes=['Anomaly']))
         concatenated_val_dataset = ConcatDataset(val_dataset)
         val_dataloader = DataLoader(concatenated_val_dataset, batch_size=batch_size, shuffle=False, collate_fn=custom_collate_BTS, generator=generator)
 
     elif model_choice == "BTS":
 
         # Define the model taxonomy and architecture
-        model = GRU_plus_MD(8, static_feature_dim=17)
+        model = GRU_plus_MD(6, static_feature_dim=17)
 
         # Load the training set
-        train_dataset = BTS_LC_Dataset(BTS_train_parquet_path, max_n_per_class=max_n_per_class, transform=truncate_BTS_light_curve_by_days_since_trigger)
+        train_dataset = BTS_LC_Dataset(BTS_train_parquet_path, max_n_per_class=max_n_per_class, transform=truncate_BTS_light_curve_by_days_since_trigger, excluded_classes=['Anomaly'])
         train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, collate_fn=custom_collate_BTS, generator=generator)
 
         # Load the validation set
         val_dataset = []
         for f in val_truncation_fractions:
             transform = partial(truncate_BTS_light_curve_fractionally, f=f)
-            val_dataset.append(BTS_LC_Dataset(BTS_val_parquet_path, transform=transform))
+            val_dataset.append(BTS_LC_Dataset(BTS_val_parquet_path, transform=transform,  excluded_classes=['Anomaly']))
         concatenated_val_dataset = ConcatDataset(val_dataset)
         val_dataloader = DataLoader(concatenated_val_dataset, batch_size=batch_size, shuffle=False, collate_fn=custom_collate_BTS, generator=generator)
 
     elif model_choice == "BTS_full_lc":
 
         # Define the model taxonomy and architecture
-        model = GRU_plus_MD(8, static_feature_dim=17)
+        model = GRU_plus_MD(6, static_feature_dim=17)
 
         # Load the training set
-        train_dataset = BTS_LC_Dataset(BTS_train_parquet_path, max_n_per_class=max_n_per_class)
+        train_dataset = BTS_LC_Dataset(BTS_train_parquet_path, max_n_per_class=max_n_per_class, excluded_classes=['Anomaly'])
         train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, collate_fn=custom_collate_BTS, generator=generator)
 
         # Load the validation set
         val_dataset = []
         for f in [1]:
             transform = partial(truncate_BTS_light_curve_fractionally, f=f)
-            val_dataset.append(BTS_LC_Dataset(BTS_val_parquet_path, transform=transform))
+            val_dataset.append(BTS_LC_Dataset(BTS_val_parquet_path, transform=transform, excluded_classes=['Anomaly']))
         concatenated_val_dataset = ConcatDataset(val_dataset)
         val_dataloader = DataLoader(concatenated_val_dataset, batch_size=batch_size, shuffle=False, collate_fn=custom_collate_BTS, generator=generator)
 
@@ -136,7 +136,7 @@ def run_training_loop(args):
     elif model_choice == "ZTF_Sims-lite":
 
         # Define the model taxonomy and architecture
-        model = GRU(8)
+        model = GRU(6)
 
         # Load the training set
         train_dataset = ZTF_SIM_LC_Dataset(ZTF_sim_train_parquet_path, include_lc_plots=False, transform=truncate_ZTF_SIM_light_curve_fractionally, max_n_per_class=max_n_per_class)
@@ -161,7 +161,7 @@ def run_training_loop(args):
     # Load pretrained model
     if pretrained_model_path != None:
         print(f"Loading pre-trained weights from {pretrained_model_path}")
-        model.load_state_dict(torch.load(pretrained_model_path, map_location=device))
+        model.load_state_dict(torch.load(pretrained_model_path, map_location=device), strict=False)
 
     # Get the train and val labels. These are used to determine weights for the loss functions
     train_labels = train_dataset.get_all_labels()
