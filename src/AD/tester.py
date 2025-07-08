@@ -9,7 +9,7 @@ from sklearn.metrics import classification_report
 from tqdm import tqdm
 from pathlib import Path    
 
-from AD.visualization import plot_confusion_matrix, plot_roc_curves, plot_train_val_history, plot_class_wise_performance_over_all_phases, plot_average_performance_over_all_phases, plot_latent_space_umap
+from AD.visualization import plot_confusion_matrix, plot_roc_curves, plot_train_val_history, plot_class_wise_performance_over_all_phases, plot_average_performance_over_all_phases, plot_latent_space_umap, plot_latent_space_tsne
 
 class Tester:
     
@@ -119,22 +119,31 @@ class Tester:
         
         title = f"Trigger+{d} days"
 
-        # Make the confusion matrix plot
-        Path(f"{self.model_dir}/plots/cf").mkdir(parents=True, exist_ok=True)
-        cf_img_file = f"{self.model_dir}/plots/cf/cf_trigger+{d}.pdf"
-        plot_confusion_matrix(np.array(true_classes), np.array(pred_classes), classes, title=title, file=cf_img_file)
+        # Make the recall confusion matrix plot
+        Path(f"{self.model_dir}/plots/cf_recall").mkdir(parents=True, exist_ok=True)
+        cf_img_file = f"{self.model_dir}/plots/cf_recall/cf_recall_trigger+{d}.pdf"
+        plot_confusion_matrix(np.array(true_classes), np.array(pred_classes), classes, "true", title=title, file=cf_img_file)
+
+        # Make the precision confusion matrix plot
+        Path(f"{self.model_dir}/plots/cf_precision").mkdir(parents=True, exist_ok=True)
+        cf_img_file = f"{self.model_dir}/plots/cf_precision/cf_precision_trigger+{d}.pdf"
+        plot_confusion_matrix(np.array(true_classes), np.array(pred_classes), classes, "pred", title=title, file=cf_img_file)
 
         # Make the umap plots
         Path(f"{self.model_dir}/plots/umap").mkdir(parents=True, exist_ok=True)
         umap_img_file = f"{self.model_dir}/plots/umap/umap_trigger+{d}.pdf"
         plot_latent_space_umap(combined_embeddings, true_classes, title, umap_img_file)
 
+        # Make the tsne plots
+        Path(f"{self.model_dir}/plots/tsne").mkdir(parents=True, exist_ok=True)
+        tsne_img_file = f"{self.model_dir}/plots/tsne/tsne_trigger+{d}.pdf"
+        plot_latent_space_tsne(combined_embeddings, true_classes, title, tsne_img_file)
+
         # Make the ROC plot
         Path(f"{self.model_dir}/plots/roc").mkdir(parents=True, exist_ok=True)
         roc_img_file = f"{self.model_dir}/plots/roc/roc_trigger+{d}.pdf"
         plot_roc_curves(combined_true_df.to_numpy(), combined_pred_df.to_numpy(), classes, title=title, file=roc_img_file)
 
-        
         # Make classification report
         report_file = f"{self.model_dir}/reports/report_trigger+{d}.csv"
         report = self.create_classification_report(np.array(true_classes), np.array(pred_classes), report_file)

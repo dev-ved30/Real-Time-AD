@@ -4,15 +4,15 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from sklearn.calibration import calibration_curve
+from sklearn.manifold import TSNE
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, roc_curve, roc_auc_score
 
 cm = plt.get_cmap('gist_rainbow')
 
-def plot_confusion_matrix(y_true, y_pred, labels, title=None, file=None):
+def plot_confusion_matrix(y_true, y_pred, labels, normalize, title=None, file=None):
 
     plt.close('all')
     plt.style.use(['default'])
-
 
     # Only keep source where a true label exists
     idx = np.where(y_true!=None)[0]
@@ -23,7 +23,7 @@ def plot_confusion_matrix(y_true, y_pred, labels, title=None, file=None):
     font = {'size'   : 25}
     plt.rc('font', **font)
     
-    cm = np.round(confusion_matrix(y_true, y_pred, labels=labels, normalize='true'),2)
+    cm = np.round(confusion_matrix(y_true, y_pred, labels=labels, normalize=normalize),2)
     disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=labels)
     disp.plot(cmap=plt.cm.Blues)
     disp.im_.colorbar.remove()
@@ -237,6 +237,46 @@ def plot_latent_space_umap(embeddings, true_classes, title=None, file=None):
     
     plt.xlabel('UMAP 1')
     plt.ylabel('UMAP 2')
+
+    plt.tight_layout()
+
+    # Add title if necessary
+    if title != None:
+        plt.title(title)
+
+    # If file path is provided, save it, or show 
+    if file != None:
+        plt.savefig(file)
+    else:
+        plt.show()
+    
+    plt.close()
+
+def plot_latent_space_tsne(embeddings, true_classes, title=None, file=None):
+
+    plt.close('all')
+    plt.style.use(['default'])
+
+    def get_tsne_of_latent_space(embeddings):
+
+        tsne_embedding = TSNE(n_components=2, learning_rate='auto',
+                  init='random', perplexity=10).fit_transform(embeddings)
+
+        return tsne_embedding
+    
+    # Get the umap embeddings
+    tsne_embedding = get_tsne_of_latent_space(embeddings)
+    
+    # plot by class
+    for c in np.unique(true_classes):
+
+        idx = np.where(np.asarray(true_classes)==c)[0]
+        plt.scatter(tsne_embedding[idx,0], tsne_embedding[idx,1], label=c, marker='.')
+
+    plt.legend(loc='upper center', bbox_to_anchor=(0.5, -0.15), fancybox=True, shadow=False, ncol=2, fontsize = 12)
+    
+    plt.xlabel('t-SNE 1')
+    plt.ylabel('t-SNE 2')
 
     plt.tight_layout()
 
