@@ -3,10 +3,10 @@ data/
 temp.py
 __pycache__
 
-src/oracle.egg-info
+src/AD.egg-info
 
-src/oracle/__pycache__/
-src/oracle/*/__pycache__/
+src/AD/__pycache__/
+src/AD/*/__pycache__/
 
 models/*/plots
 models/*/reports
