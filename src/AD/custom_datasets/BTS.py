@@ -148,7 +148,7 @@ class BTS_LC_Dataset(torch.utils.data.Dataset):
                         postage_stamps[f"{f}_{img_type}"] = np.zeros(ztf_alert_image_dimension)
                     else:
                         postage_stamps[f"{f}_{img_type}"] = np.reshape(img_data, ztf_alert_image_dimension)
-            postage_stamps = self.get_postage_stamp_plot(postage_stamps)
+            postage_stamps = self.get_postage_stamp(postage_stamps)
             dictionary['postage_stamp'] = postage_stamps
 
         # This operation is costly. Only do it if include_lc_plots stamps is true
@@ -322,6 +322,17 @@ class BTS_LC_Dataset(torch.utils.data.Dataset):
 
         return img_arr
     
+    def get_postage_stamp(self, examples):
+
+        img_length = ztf_alert_image_dimension[0]
+        canvas = np.zeros((len(ztf_filters), img_length, img_length)) 
+
+        # Loop through all of the filters
+        for j, f in enumerate(ztf_filters):
+            canvas[j,:,:] = examples[f"{f}_reference"]
+        canvas = torch.from_numpy(canvas*255)
+        return canvas
+
     def get_postage_stamp_plot(self, examples):
 
         img_length = ztf_alert_image_dimension[0]
@@ -421,8 +432,8 @@ def custom_collate_BTS(batch):
 
     lengths = np.zeros((batch_size), dtype=np.float32)
     static_features_tensor = torch.zeros((batch_size, n_static_features),  dtype=torch.float32)
-    lc_plot_tensor = torch.zeros((batch_size, n_channels, img_height, img_width), dtype=torch.float32)
-    postage_stamps_tensor = torch.zeros((batch_size, n_channels, img_height, img_width), dtype=torch.float32)
+    lc_plot_tensor = torch.zeros((batch_size, n_channels, img_height, img_height), dtype=torch.float32)
+    postage_stamps_tensor = torch.zeros((batch_size, n_channels, 63, 63), dtype=torch.float32)
 
     for i, sample in enumerate(batch):
 
@@ -491,7 +502,7 @@ if __name__=='__main__':
     
     # <--- Example usage of the dataset --->
 
-    dataset = BTS_LC_Dataset(BTS_train_parquet_path, include_postage_stamps=True, include_lc_plots=True, transform=truncate_BTS_light_curve_fractionally, max_n_per_class=1000)
+    dataset = BTS_LC_Dataset(BTS_train_parquet_path, include_postage_stamps=True, include_lc_plots=False, transform=truncate_BTS_light_curve_fractionally, max_n_per_class=1000)
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=16, collate_fn=custom_collate_BTS, shuffle=True)
 
     for batch in tqdm(dataloader):
@@ -504,8 +515,8 @@ if __name__=='__main__':
         if 'postage_stamp' in batch.keys():
             show_batch(batch['postage_stamp'], batch['label'])
         
-        if 'lc_plot' in batch.keys():
-            show_batch(batch['lc_plot'], batch['label'])
+        # if 'lc_plot' in batch.keys():
+        #     show_batch(batch['lc_plot'], batch['label'])
 
     # imgs = []
     # lc_d = []
