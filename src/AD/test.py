@@ -10,6 +10,7 @@ from torch.utils.data import DataLoader
 from AD.architectures import *
 from AD.custom_datasets.BTS import *
 from AD.custom_datasets.ZTF_sims import *
+from AD.presets import get_model, get_test_loaders
 
 # <----- Defaults for training the models ----->
 default_batch_size = 1024
@@ -47,113 +48,19 @@ def run_testing_loop(args):
     Path(f"{model_dir}/plots").mkdir(parents=True, exist_ok=True)
     Path(f"{model_dir}/reports").mkdir(parents=True, exist_ok=True)
 
-    # Keep generator on the CPU
-    generator = torch.Generator(device=device)
+    # Get the correct architecture and load weights
+    model = get_model(model_choice)
+    model.load_state_dict(torch.load(f'{model_dir}/best_model.pth', map_location=device), strict=False)
 
-    if model_choice == "BTS-lite":
+    # Set up testing
+    model = model.to(device)
+    model.setup_testing(model_dir, device)
 
-        # Define the model architecture
-        model = GRU(6)
-        model.load_state_dict(torch.load(f'{model_dir}/best_model.pth', map_location=device), strict=False)
-
-        # Set up testing
-        model = model.to(device)
-        model.setup_testing(model_dir, device)
-
-        # Load the training set
-        test_dataset = BTS_LC_Dataset(BTS_test_parquet_path, include_lc_plots=False, max_n_per_class=max_n_per_class)
-
-        for d in defaults_days_list:
-            
-            # Set the custom transform and reate dataloader
-            test_dataset.transform = partial(truncate_BTS_light_curve_by_days_since_trigger, d=d)
-            test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True, collate_fn=custom_collate_BTS, generator=generator)
-
-            model.run_all_analysis(test_dataloader, d)
-
-    elif model_choice == "BTS":
-
-        # Define the model architecture
-        model = GRU_plus_MD(6, static_feature_dim=17)
-        model.load_state_dict(torch.load(f'{model_dir}/best_model.pth', map_location=device), strict=False)
-
-        # Set up testing
-        model = model.to(device)
-        model.setup_testing(model_dir, device)
-
-        # Load the training set
-        test_dataset = BTS_LC_Dataset(BTS_test_parquet_path, include_lc_plots=False, max_n_per_class=max_n_per_class, excluded_classes=['Anomaly'])
-
-        for d in defaults_days_list:
-            
-            # Set the custom transform and reate dataloader
-            test_dataset.transform = partial(truncate_BTS_light_curve_by_days_since_trigger, d=d)
-            test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True, collate_fn=custom_collate_BTS, generator=generator)
-
-            model.run_all_analysis(test_dataloader, d)
-
-    elif model_choice == "BTS_full_lc":
-
-        # Define the model architecture
-        model = GRU_plus_MD(6, static_feature_dim=17)
-        model.load_state_dict(torch.load(f'{model_dir}/best_model.pth', map_location=device), strict=False)
-
-        # Set up testing
-        model = model.to(device)
-        model.setup_testing(model_dir, device)
-
-        # Load the training set
-        test_dataset = BTS_LC_Dataset(BTS_test_parquet_path, include_lc_plots=False, max_n_per_class=max_n_per_class,  excluded_classes=['Anomaly'])
-
-        for d in defaults_days_list:
-            
-            # Set the custom transform and reate dataloader
-            test_dataset.transform = partial(truncate_BTS_light_curve_by_days_since_trigger, d=d)
-            test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True, collate_fn=custom_collate_BTS, generator=generator)
-
-            model.run_all_analysis(test_dataloader, d)
-
-    elif model_choice == "BTS_MM":
-
-        # Define the model architecture
-        model = GRU_MM(6, static_feature_dim=17)
-        model.load_state_dict(torch.load(f'{model_dir}/best_model.pth', map_location=device), strict=False)
-
-        # Set up testing
-        model = model.to(device)
-        model.setup_testing(model_dir, device)
-
-        # Load the training set
-        test_dataset = BTS_LC_Dataset(BTS_test_parquet_path, include_postage_stamps=True, max_n_per_class=max_n_per_class,  excluded_classes=['Anomaly'])
-
-        for d in defaults_days_list:
-            
-            # Set the custom transform and reate dataloader
-            test_dataset.transform = partial(truncate_BTS_light_curve_by_days_since_trigger, d=d)
-            test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True, collate_fn=custom_collate_BTS, generator=generator)
-
-            model.run_all_analysis(test_dataloader, d)
-
-    elif model_choice == "ZTF_Sims-lite":
-
-        # Define the model architecture
-        model = GRU(6)
-        model.load_state_dict(torch.load(f'{model_dir}/best_model.pth', map_location=device), strict=False)
-
-        # Set up testing
-        model = model.to(device)
-        model.setup_testing(model_dir, device)
-
-        # Load the training set
-        test_dataset = ZTF_SIM_LC_Dataset(ZTF_sim_test_parquet_path, include_lc_plots=False, max_n_per_class=max_n_per_class)
-
-        for d in defaults_days_list:
-            
-            # Set the custom transform and reate dataloader
-            test_dataset.transform = partial(truncate_BTS_light_curve_by_days_since_trigger, d=d)
-            test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True, collate_fn=custom_collate_ZTF_SIM, generator=generator)
-
-            model.run_all_analysis(test_dataloader, d)
+    # Get the test dataset augmented to different days
+    test_loaders = get_test_loaders(model_choice, batch_size, max_n_per_class, defaults_days_list, excluded_classes=['Anomaly'])
+    
+    for d, test_dataloader in zip(defaults_days_list, test_loaders):
+        model.run_all_analysis(test_dataloader, d)
 
     model.create_loss_history_plot()
     model.create_metric_phase_plots()

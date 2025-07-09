@@ -8,6 +8,7 @@ from torch.utils.data import DataLoader, ConcatDataset
 from AD.architectures import *
 from AD.custom_datasets.BTS import *
 from AD.custom_datasets.ZTF_sims import *
+from AD.presets import get_model, get_train_loader, get_val_loader
 
 # <----- Defaults for training the models ----->
 default_num_epochs = 100
@@ -78,94 +79,12 @@ def run_training_loop(args):
     model_choice = args.model
     pretrained_model_path = args.load_weights
 
-    # Keep generator on the CPU
-    generator = torch.Generator(device=device)
+    # Get the model
+    model = get_model(model_choice)
 
-    if model_choice == "BTS-lite":
-
-        # Define the model taxonomy and architecture
-        model = GRU(6)
-
-        # Load the training set
-        train_dataset = BTS_LC_Dataset(BTS_train_parquet_path, max_n_per_class=max_n_per_class, transform=truncate_BTS_light_curve_by_days_since_trigger, excluded_classes=['Anomaly'])
-        train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, collate_fn=custom_collate_BTS, generator=generator)
-
-        # Load the validation set
-        val_dataset = []
-        for f in val_truncation_fractions:
-            transform = partial(truncate_BTS_light_curve_fractionally, f=f)
-            val_dataset.append(BTS_LC_Dataset(BTS_val_parquet_path, transform=transform, excluded_classes=['Anomaly']))
-        concatenated_val_dataset = ConcatDataset(val_dataset)
-        val_dataloader = DataLoader(concatenated_val_dataset, batch_size=batch_size, shuffle=False, collate_fn=custom_collate_BTS, generator=generator)
-
-    elif model_choice == "BTS":
-
-        # Define the model taxonomy and architecture
-        model = GRU_plus_MD(6, static_feature_dim=17)
-
-        # Load the training set
-        train_dataset = BTS_LC_Dataset(BTS_train_parquet_path, max_n_per_class=max_n_per_class, transform=truncate_BTS_light_curve_by_days_since_trigger, excluded_classes=['Anomaly'])
-        train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, collate_fn=custom_collate_BTS, generator=generator)
-
-        # Load the validation set
-        val_dataset = []
-        for f in val_truncation_fractions:
-            transform = partial(truncate_BTS_light_curve_fractionally, f=f)
-            val_dataset.append(BTS_LC_Dataset(BTS_val_parquet_path, transform=transform,  excluded_classes=['Anomaly']))
-        concatenated_val_dataset = ConcatDataset(val_dataset)
-        val_dataloader = DataLoader(concatenated_val_dataset, batch_size=batch_size, shuffle=False, collate_fn=custom_collate_BTS, generator=generator)
-
-    elif model_choice == "BTS_MM":
-
-        # Define the model taxonomy and architecture
-        model = GRU_MM(6, static_feature_dim=17)
-
-        # Load the training set
-        train_dataset = BTS_LC_Dataset(BTS_train_parquet_path, max_n_per_class=max_n_per_class, transform=truncate_BTS_light_curve_by_days_since_trigger, excluded_classes=['Anomaly'], include_postage_stamps=True)
-        train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, collate_fn=custom_collate_BTS, generator=generator)
-
-        # Load the validation set
-        val_dataset = []
-        for f in val_truncation_fractions:
-            transform = partial(truncate_BTS_light_curve_fractionally, f=f)
-            val_dataset.append(BTS_LC_Dataset(BTS_val_parquet_path, transform=transform,  excluded_classes=['Anomaly'], include_postage_stamps=True))
-        concatenated_val_dataset = ConcatDataset(val_dataset)
-        val_dataloader = DataLoader(concatenated_val_dataset, batch_size=batch_size, shuffle=False, collate_fn=custom_collate_BTS, generator=generator)
-
-    elif model_choice == "BTS_full_lc":
-
-        # Define the model taxonomy and architecture
-        model = GRU_plus_MD(6, static_feature_dim=17)
-
-        # Load the training set
-        train_dataset = BTS_LC_Dataset(BTS_train_parquet_path, max_n_per_class=max_n_per_class, excluded_classes=['Anomaly'])
-        train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, collate_fn=custom_collate_BTS, generator=generator)
-
-        # Load the validation set
-        val_dataset = []
-        for f in [1]:
-            transform = partial(truncate_BTS_light_curve_fractionally, f=f)
-            val_dataset.append(BTS_LC_Dataset(BTS_val_parquet_path, transform=transform, excluded_classes=['Anomaly']))
-        concatenated_val_dataset = ConcatDataset(val_dataset)
-        val_dataloader = DataLoader(concatenated_val_dataset, batch_size=batch_size, shuffle=False, collate_fn=custom_collate_BTS, generator=generator)
-
-
-    elif model_choice == "ZTF_Sims-lite":
-
-        # Define the model taxonomy and architecture
-        model = GRU(6)
-
-        # Load the training set
-        train_dataset = ZTF_SIM_LC_Dataset(ZTF_sim_train_parquet_path, include_lc_plots=False, transform=truncate_ZTF_SIM_light_curve_fractionally, max_n_per_class=max_n_per_class)
-        train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, collate_fn=custom_collate_ZTF_SIM, generator=generator)
-        
-        # Load the validation set
-        val_dataset = []
-        for f in val_truncation_fractions:
-            transform = partial(truncate_ZTF_SIM_light_curve_fractionally, f=f)
-            val_dataset.append(ZTF_SIM_LC_Dataset(ZTF_sim_val_parquet_path, transform=transform))
-        concatenated_val_dataset = ConcatDataset(val_dataset)
-        val_dataloader = DataLoader(concatenated_val_dataset, batch_size=batch_size, shuffle=False, collate_fn=custom_collate_ZTF_SIM, generator=generator)
+    # Get the train and validation datasets
+    train_dataloader, train_labels = get_train_loader(model_choice, batch_size, max_n_per_class, ['Anomaly'])
+    val_dataloader, val_labels = get_val_loader(model_choice, batch_size, val_truncation_fractions, ['Anomaly'])
 
     # This is used to log data
     wandb_run = get_wandb_run(args)
@@ -179,10 +98,6 @@ def run_training_loop(args):
     if pretrained_model_path != None:
         print(f"Loading pre-trained weights from {pretrained_model_path}")
         model.load_state_dict(torch.load(pretrained_model_path, map_location=device), strict=False)
-
-    # Get the train and val labels. These are used to determine weights for the loss functions
-    train_labels = train_dataset.get_all_labels()
-    val_labels = val_dataset[0].get_all_labels()
 
     # Fit the model
     model = model.to(device)
