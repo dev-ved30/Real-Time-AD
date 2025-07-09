@@ -18,7 +18,7 @@ default_max_n_per_class = None
 default_model_dir = None
 
 # <----- Config for the model ----->
-model_choices = ["BTS", "BTS-lite", "BTS_full_lc", "ZTF_Sims-lite"]
+model_choices = ["BTS", "BTS-lite", "BTS_MM", "BTS_full_lc", "ZTF_Sims-lite"]
 default_model_type = "BTS"
 
 # Switch device to GPU if available
@@ -112,6 +112,23 @@ def run_training_loop(args):
         for f in val_truncation_fractions:
             transform = partial(truncate_BTS_light_curve_fractionally, f=f)
             val_dataset.append(BTS_LC_Dataset(BTS_val_parquet_path, transform=transform,  excluded_classes=['Anomaly']))
+        concatenated_val_dataset = ConcatDataset(val_dataset)
+        val_dataloader = DataLoader(concatenated_val_dataset, batch_size=batch_size, shuffle=False, collate_fn=custom_collate_BTS, generator=generator)
+
+    elif model_choice == "BTS_MM":
+
+        # Define the model taxonomy and architecture
+        model = GRU_MM(6, static_feature_dim=17)
+
+        # Load the training set
+        train_dataset = BTS_LC_Dataset(BTS_train_parquet_path, max_n_per_class=max_n_per_class, transform=truncate_BTS_light_curve_by_days_since_trigger, excluded_classes=['Anomaly'], include_postage_stamps=True)
+        train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, collate_fn=custom_collate_BTS, generator=generator)
+
+        # Load the validation set
+        val_dataset = []
+        for f in val_truncation_fractions:
+            transform = partial(truncate_BTS_light_curve_fractionally, f=f)
+            val_dataset.append(BTS_LC_Dataset(BTS_val_parquet_path, transform=transform,  excluded_classes=['Anomaly'], include_postage_stamps=True))
         concatenated_val_dataset = ConcatDataset(val_dataset)
         val_dataloader = DataLoader(concatenated_val_dataset, batch_size=batch_size, shuffle=False, collate_fn=custom_collate_BTS, generator=generator)
 
