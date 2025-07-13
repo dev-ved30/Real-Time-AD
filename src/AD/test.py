@@ -58,12 +58,17 @@ def run_testing_loop(args):
 
     # Get the test dataset augmented to different days
     test_loaders = get_test_loaders(model_choice, batch_size, max_n_per_class, defaults_days_list, excluded_classes=['Anomaly'])
-    
     for d, test_dataloader in zip(defaults_days_list, test_loaders):
         model.run_all_analysis(test_dataloader, d)
 
+    # Include the anomalies to see the clustering
+    test_loaders = get_test_loaders(model_choice, batch_size, max_n_per_class, defaults_days_list)
+    for d, test_dataloader in zip(defaults_days_list, test_loaders):
+        model.make_AD_UMAP_plots(test_dataloader, d)
+
     model.create_loss_history_plot()
     model.create_metric_phase_plots()
+    model.create_time_evolved_umap_plot(defaults_days_list)
 
 
 def main():
