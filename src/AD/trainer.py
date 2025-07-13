@@ -11,6 +11,8 @@ from torch.nn import CrossEntropyLoss
 from tqdm import tqdm
 from sklearn.preprocessing import OneHotEncoder
 
+from AD.loss import CenterLoss
+
 def get_loss_weights(one_hot_encodings):
 
     # Total number of samples
@@ -69,6 +71,10 @@ class Trainer:
         self.train_criterion = CrossEntropyLoss(weight=self.train_weights)
         self.val_criterion = CrossEntropyLoss(weight=self.val_weights)
 
+        # Center loss to help with clustering
+        self.center_loss = CenterLoss(len(self.one_hot_encoder.categories_), 64, device)
+        self.center_loss_weight = 0
+        
         self.optimizer = optim.Adam(self.parameters(), lr=lr)
 
         self.wandb_run = wandb_run
@@ -93,8 +99,12 @@ class Trainer:
 
             # Forward pass
             logits = self(batch)
-
-            loss = self.train_criterion(logits, label_encodings)
+            latent_space_embeddings = self.get_latent_space_embeddings(batch)
+            
+            # Compute the loss
+            xe_loss = self.train_criterion(logits, label_encodings)
+            center_loss = self.center_loss(latent_space_embeddings, torch.argmax(label_encodings, dim=1))
+            loss = xe_loss + self.center_loss_weight * center_loss
 
             # Backward pass
             self.optimizer.zero_grad()
@@ -123,7 +133,13 @@ class Trainer:
                 
                 # Forward pass
                 logits = self(batch)
-                loss = self.val_criterion(logits, label_encodings)
+                latent_space_embeddings = self.get_latent_space_embeddings(batch)
+
+                # Compute the loss
+                xe_loss = self.val_criterion(logits, label_encodings)
+                center_loss = self.center_loss(latent_space_embeddings, torch.argmax(label_encodings, dim=1))
+                loss = xe_loss + self.center_loss_weight * center_loss
+
                 val_loss_values.append(loss.item())
 
         return np.mean(val_loss_values)
@@ -170,6 +186,10 @@ class Trainer:
             print(f"----------\nStarting epoch {epoch+1}/{num_epochs}...")
 
             start_time = time.time()
+
+            if epoch > 10:
+
+                self.center_loss_weight = 1
 
             train_loss = self.train_one_epoch(train_loader)
             val_loss = self.validate(val_loader)
