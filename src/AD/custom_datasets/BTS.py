@@ -110,6 +110,7 @@ class BTS_LC_Dataset(torch.utils.data.Dataset):
 
         ztfid = row['ZTFID']
         astrophysical_class = row['class']
+        bts_class = row['bts_class']
 
         lc_length = len(row['jd'])
 
@@ -132,6 +133,7 @@ class BTS_LC_Dataset(torch.utils.data.Dataset):
             'ts': time_series_data,
             'static': static_data,
             'label': astrophysical_class,
+            'bts_class': bts_class,
             'ZTFID': ztfid,
         }
 
@@ -429,6 +431,7 @@ def custom_collate_BTS(batch):
     ts_array = []
     label_array = []
     ztfid_array = []
+    bts_array = []
 
     lengths = np.zeros((batch_size), dtype=np.float32)
     static_features_tensor = torch.zeros((batch_size, n_static_features),  dtype=torch.float32)
@@ -440,6 +443,7 @@ def custom_collate_BTS(batch):
         ts_array.append(sample['ts'])
         label_array.append(sample['label'])
         ztfid_array.append(sample['ZTFID'])
+        bts_array.append(sample['bts_class'])
         
         lengths[i] = sample['ts'].shape[0]
         static_features_tensor[i, :] = sample['static'][-1, :]
@@ -452,6 +456,7 @@ def custom_collate_BTS(batch):
 
     lengths = torch.from_numpy(lengths)
     label_array = np.array(label_array)
+    bts_array = np.array(bts_array)
     ztfid_array = np.array(ztfid_array)
 
     ts_tensor = pad_sequence(ts_array, batch_first=True, padding_value=flag_value)
@@ -461,6 +466,7 @@ def custom_collate_BTS(batch):
         'static': static_features_tensor,
         'length': lengths,
         'label': label_array,
+        'bts_class': bts_array, 
         'ZTFID': ztfid_array,
     }
 
