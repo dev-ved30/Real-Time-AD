@@ -24,7 +24,7 @@ def get_model(model_choice):
     return model
 
 
-def get_train_loader(model_choice, batch_size, max_n_per_class, excluded_classes):
+def get_train_loader(model_choice, batch_size, max_n_per_class, excluded_classes=[]):
 
     # Keep generator on the CPU
     generator = torch.Generator(device=device)
@@ -64,7 +64,7 @@ def get_train_loader(model_choice, batch_size, max_n_per_class, excluded_classes
     return train_dataloader, train_labels
 
 
-def get_val_loader(model_choice, batch_size, val_truncation_fractions, excluded_classes):
+def get_val_loader(model_choice, batch_size, val_truncation_fractions, excluded_classes=[]):
 
     # Keep generator on the CPU
     generator = torch.Generator(device=device)
@@ -123,7 +123,7 @@ def get_val_loader(model_choice, batch_size, val_truncation_fractions, excluded_
     val_labels = val_dataset[0].get_all_labels()
     return val_dataloader, val_labels
 
-def get_test_loaders(model_choice, batch_size, max_n_per_class, days_list, excluded_classes):
+def get_test_loaders(model_choice, batch_size, max_n_per_class, days_list, excluded_classes=[]):
 
     # Keep generator on the CPU
     generator = torch.Generator(device=device)
