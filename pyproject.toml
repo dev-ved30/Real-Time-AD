@@ -24,6 +24,7 @@ dependencies = [
     "wandb==0.20.1",
     "scikit-learn==1.6.1",
     "umap-learn==0.5.8",
+    "plotly==6.2.0",
 ]
 
 [build-system]
