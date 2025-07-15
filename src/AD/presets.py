@@ -132,12 +132,10 @@ def get_test_loaders(model_choice, batch_size, max_n_per_class, days_list, exclu
 
     if model_choice == "BTS-lite":
 
-        # Load the training set
-        test_dataset = BTS_LC_Dataset(BTS_test_parquet_path, include_lc_plots=False, max_n_per_class=max_n_per_class, excluded_classes=excluded_classes)
-
         for d in days_list:
             
             # Set the custom transform and recreate dataloader
+            test_dataset = BTS_LC_Dataset(BTS_test_parquet_path, include_lc_plots=False, max_n_per_class=max_n_per_class, excluded_classes=excluded_classes)
             test_dataset.transform = partial(truncate_BTS_light_curve_by_days_since_trigger, d=d)
             test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True, collate_fn=custom_collate_BTS, generator=generator)
             test_loaders.append(test_dataloader)
@@ -167,9 +165,25 @@ def get_test_loaders(model_choice, batch_size, max_n_per_class, days_list, exclu
         for d in days_list:
             
             # Set the custom transform and recreate dataloader
-            test_dataset = BTS_LC_Dataset(BTS_test_parquet_path, include_postage_stamps=True, max_n_per_class=max_n_per_class,  excluded_classes=excluded_classes)
-            test_dataset.transform = partial(truncate_BTS_light_curve_by_days_since_trigger, d=d)
-            test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True, collate_fn=custom_collate_BTS, generator=generator)
+            if 'Anomaly' not in excluded_classes:
+
+                train_dataset_anomalies = BTS_LC_Dataset(BTS_train_parquet_path, include_postage_stamps=True, max_n_per_class=max_n_per_class,  excluded_classes=['SN-Ia','SN-Ib/c','SN-II','SLSN-I','CV','AGN'])
+                train_dataset_anomalies.transform = partial(truncate_BTS_light_curve_by_days_since_trigger, d=d)
+
+                test_dataset = BTS_LC_Dataset(BTS_test_parquet_path, include_postage_stamps=True, max_n_per_class=max_n_per_class,  excluded_classes=excluded_classes)
+                test_dataset.transform = partial(truncate_BTS_light_curve_by_days_since_trigger, d=d)
+
+                test_dataloader = DataLoader(ConcatDataset([train_dataset_anomalies, test_dataset]), batch_size=batch_size, shuffle=True, collate_fn=custom_collate_BTS, generator=generator)
+
+            else:
+
+                test_dataset = BTS_LC_Dataset(BTS_test_parquet_path, include_postage_stamps=True, max_n_per_class=max_n_per_class,  excluded_classes=excluded_classes)
+                test_dataset.transform = partial(truncate_BTS_light_curve_by_days_since_trigger, d=d)
+
+                test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True, collate_fn=custom_collate_BTS, generator=generator)
+
+
+
             test_loaders.append(test_dataloader)
 
     elif model_choice == "ZTF_Sims-lite":

@@ -1,7 +1,9 @@
 import umap
 
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
+import plotly.express as px
 
 from sklearn.calibration import calibration_curve
 from sklearn.manifold import TSNE
@@ -213,25 +215,38 @@ def plot_average_performance_over_all_phases(metric, df, model_dir=None):
 
     plt.close()
 
-def plot_latent_space_umap(embeddings, true_classes, title=None, file=None):
+def plot_latent_space_umap(embeddings, bts_classes, true_classes, title=None, file=None):
 
     plt.close('all')
     plt.style.use(['default'])
 
-    def get_umap_of_latent_space(embeddings):
+    def get_umap_of_latent_space(embeddings, true_classes):
 
+        idx = np.where(np.asarray(true_classes)!='Anomaly')[0]
         reducer = umap.UMAP(random_state=42)
-        umap_embedding = reducer.fit_transform(embeddings.to_numpy())
+
+        reducer.fit(embeddings[idx,:])
+        umap_embedding = reducer.transform(embeddings)
         return umap_embedding
     
     # Get the umap embeddings
-    umap_embedding = get_umap_of_latent_space(embeddings)
+
+    umap_embedding = get_umap_of_latent_space(embeddings.to_numpy(), true_classes)
     
     # plot by class
+
+    df = pd.DataFrame(umap_embedding, columns=['umap1','umap2'])
+    df['class'] = true_classes
+    df['bts_class'] = bts_classes
+
+    fig = px.scatter(df, x='umap1', y='umap2', color=f"class", hover_data=['class', 'bts_class'])#, cmap='viridis', marker=markers[i])
+    fig.write_html(file.split('.')[0]+'.html')
+
     for c in np.unique(true_classes):
 
         idx = np.where(np.asarray(true_classes)==c)[0]
         plt.scatter(umap_embedding[idx,0], umap_embedding[idx,1], label=c, marker='.')
+
 
     plt.legend(loc='upper center', bbox_to_anchor=(0.5, -0.15), fancybox=True, shadow=False, ncol=2, fontsize = 12)
     

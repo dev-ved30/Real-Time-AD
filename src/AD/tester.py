@@ -102,16 +102,17 @@ class Tester:
         
         true_classes = np.array(true_classes)
         bts_classes = np.array(bts_classes)
+        ztf_ids = np.array(ztf_ids)
         combined_pred_df = pd.concat(combined_pred_df, ignore_index=True)
         combined_embeddings = pd.concat(combined_embeddings, ignore_index=True)
 
-        return true_classes, bts_classes, combined_pred_df, combined_embeddings
+        return ztf_ids, true_classes, bts_classes, combined_pred_df, combined_embeddings
 
 
     def run_all_analysis(self, test_loader, d):
 
         print(f'==========\nStarting Analysis for Trigger + {d} days...')
-        true_classes, _, combined_pred_df, combined_embeddings = self.run_test_loop(test_loader)     
+        ztf_ids, true_classes, bts_classes, combined_pred_df, combined_embeddings = self.run_test_loop(test_loader)     
 
         # Make dataframe for true labels encodings
         combined_true_df = self.one_hot_encoder.transform(true_classes.reshape(-1, 1)).toarray()
@@ -139,7 +140,7 @@ class Tester:
         # Make the umap plots
         Path(f"{self.model_dir}/plots/umap").mkdir(parents=True, exist_ok=True)
         umap_img_file = f"{self.model_dir}/plots/umap/umap_trigger+{d}.pdf"
-        plot_latent_space_umap(combined_embeddings, true_classes, title, umap_img_file)
+        plot_latent_space_umap(combined_embeddings, bts_classes, true_classes, title, umap_img_file)
 
         # Make the tsne plots
         Path(f"{self.model_dir}/plots/tsne").mkdir(parents=True, exist_ok=True)
@@ -158,13 +159,13 @@ class Tester:
 
     def make_AD_UMAP_plots(self, test_loader, d):
 
-        true_classes, bts_classes, _, combined_embeddings = self.run_test_loop(test_loader)     
+        ztf_ids, true_classes, bts_classes, _, combined_embeddings = self.run_test_loop(test_loader)     
         title = f"Trigger+{d} days"
 
         # Make the umap plots
         Path(f"{self.model_dir}/plots/umap_AD").mkdir(parents=True, exist_ok=True)
         umap_img_file = f"{self.model_dir}/plots/umap_AD/umap_ad_trigger+{d}.pdf"
-        plot_latent_space_umap(combined_embeddings, true_classes, title, umap_img_file)
+        plot_latent_space_umap(combined_embeddings, bts_classes, true_classes, title, umap_img_file)
 
         # Make the tsne plots
         Path(f"{self.model_dir}/plots/tsne_AD").mkdir(parents=True, exist_ok=True)
@@ -176,6 +177,7 @@ class Tester:
         combined_embeddings['class'] = true_classes
         combined_embeddings['days_since_trigger'] = [d]*len(true_classes)
         combined_embeddings['bts_class'] = bts_classes
+        combined_embeddings['ztf_ids'] = ztf_ids
         combined_embeddings.to_csv(f"{self.model_dir}/embeddings/trigger+{d}.csv", index=False)
 
 
