@@ -405,7 +405,7 @@ def truncate_BTS_light_curve_fractionally(x_ts, x_static, f=None):
 
     return x_ts, x_static
 
-def truncate_BTS_light_curve_by_days_since_trigger(x_ts, x_static, d=None):
+def truncate_BTS_light_curve_by_days_since_trigger(x_ts, x_static, d=None, add_jitter=False):
 
     # NOTE: For BTS we are making the assumption that the data set does not contain any non detections. This is not the case with ELAsTiCC
     if d == None:
@@ -414,6 +414,14 @@ def truncate_BTS_light_curve_by_days_since_trigger(x_ts, x_static, d=None):
     # Get the days data
     jd_index = time_dependent_feature_list.index('jd')
     jd = x_ts[:, jd_index]
+
+    if add_jitter:
+
+        flux_index = time_dependent_feature_list.index('flux')
+        flux_err_index = time_dependent_feature_list.index('flux_err')
+
+        x_ts[:, flux_index] = x_ts[:, flux_index] + np.random.normal([0]*x_ts.shape[0],  x_ts[:, flux_err_index])
+        x_ts[:, flux_err_index] = x_ts[:, flux_err_index] + np.random.normal([0]*x_ts.shape[0],  0.01)
 
     # Get indices of observations within d days of the first detection (trigger)
     idx = np.where(jd <= d)[0]

@@ -39,8 +39,8 @@ BTS_to_Astrophysical_mappings = {
     'SN IIb': 'Anomaly',
     'SN IIb-pec': 'Anomaly',
     'SN IIb?': 'Anomaly',
-    'SN IIn': 'SN-IIn',
-    'SN IIn?': 'SN-IIn',
+    'SN IIn': 'SN-II',
+    'SN IIn?': 'SN-II',
     'SN Ia': 'SN-Ia',
     'SN Ia-00cx': 'Anomaly',# pec
     'SN Ia-03fg': 'Anomaly',# pec

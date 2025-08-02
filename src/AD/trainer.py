@@ -73,7 +73,7 @@ class Trainer:
 
         # Center loss to help with clustering
         self.center_loss = CenterLoss(len(self.one_hot_encoder.categories_), 64, device)
-        self.center_loss_weight = 0
+        self.center_loss_weight = 1
         
         self.optimizer = optim.Adam(self.parameters(), lr=lr)
 
@@ -95,7 +95,7 @@ class Trainer:
             # Get the label encodings
             label_encodings = torch.from_numpy(
                                 self.one_hot_encoder.transform(np.asarray(batch['label']).reshape(-1, 1)).toarray()
-                            ).to(device=self.device)           
+                            ).argmax(dim=1).to(device=self.device)           
 
             # Forward pass
             logits = self(batch)
@@ -103,7 +103,7 @@ class Trainer:
             
             # Compute the loss
             xe_loss = self.train_criterion(logits, label_encodings)
-            center_loss = self.center_loss(latent_space_embeddings, torch.argmax(label_encodings, dim=1))
+            center_loss = self.center_loss(latent_space_embeddings, label_encodings)
             loss = xe_loss + self.center_loss_weight * center_loss
 
             # Backward pass
@@ -129,7 +129,7 @@ class Trainer:
                 # Get the label encodings
                 label_encodings = torch.from_numpy(
                                     self.one_hot_encoder.transform(np.asarray(batch['label']).reshape(-1, 1)).toarray()
-                                ).to(device=self.device)    
+                                ).argmax(dim=1).to(device=self.device)    
                 
                 # Forward pass
                 logits = self(batch)
@@ -137,7 +137,7 @@ class Trainer:
 
                 # Compute the loss
                 xe_loss = self.val_criterion(logits, label_encodings)
-                center_loss = self.center_loss(latent_space_embeddings, torch.argmax(label_encodings, dim=1))
+                center_loss = self.center_loss(latent_space_embeddings, label_encodings)
                 loss = xe_loss + self.center_loss_weight * center_loss
 
                 val_loss_values.append(loss.item())
@@ -186,10 +186,6 @@ class Trainer:
             print(f"----------\nStarting epoch {epoch+1}/{num_epochs}...")
 
             start_time = time.time()
-
-            if epoch > 10:
-
-                self.center_loss_weight = 1
 
             train_loss = self.train_one_epoch(train_loader)
             val_loss = self.validate(val_loader)

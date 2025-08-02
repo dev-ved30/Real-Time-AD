@@ -32,19 +32,22 @@ def get_train_loader(model_choice, batch_size, max_n_per_class, excluded_classes
     if model_choice == "BTS-lite":
 
         # Load the training set
-        train_dataset = BTS_LC_Dataset(BTS_train_parquet_path, max_n_per_class=max_n_per_class, transform=truncate_BTS_light_curve_by_days_since_trigger, excluded_classes=excluded_classes)
+        transform = partial(truncate_BTS_light_curve_by_days_since_trigger, add_jitter=True)
+        train_dataset = BTS_LC_Dataset(BTS_train_parquet_path, max_n_per_class=max_n_per_class, transform=transform, excluded_classes=excluded_classes)
         train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, collate_fn=custom_collate_BTS, generator=generator)
 
     elif model_choice == "BTS":
 
         # Load the training set
-        train_dataset = BTS_LC_Dataset(BTS_train_parquet_path, max_n_per_class=max_n_per_class, transform=truncate_BTS_light_curve_by_days_since_trigger, excluded_classes=excluded_classes)
+        transform = partial(truncate_BTS_light_curve_by_days_since_trigger, add_jitter=True)
+        train_dataset = BTS_LC_Dataset(BTS_train_parquet_path, max_n_per_class=max_n_per_class, transform=transform, excluded_classes=excluded_classes)
         train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, collate_fn=custom_collate_BTS, generator=generator)
 
     elif model_choice == "BTS_MM":
 
         # Load the training set
-        train_dataset = BTS_LC_Dataset(BTS_train_parquet_path, max_n_per_class=max_n_per_class, transform=truncate_BTS_light_curve_by_days_since_trigger, excluded_classes=excluded_classes, include_postage_stamps=True)
+        transform = partial(truncate_BTS_light_curve_by_days_since_trigger, add_jitter=True)
+        train_dataset = BTS_LC_Dataset(BTS_train_parquet_path, max_n_per_class=max_n_per_class, transform=transform, excluded_classes=excluded_classes, include_postage_stamps=True)
         train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, collate_fn=custom_collate_BTS, generator=generator)
 
     elif model_choice == "BTS_full_lc":
