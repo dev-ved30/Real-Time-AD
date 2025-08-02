@@ -59,8 +59,10 @@ class GRU_plus_MD(Classifier):
         # merge & head
         self.dense3 = nn.Linear(100 + 10, 100)
         self.dense4 = nn.Linear(100, 64)
+        self.dense5 = nn.Linear(64, 32)
+        self.dense6 = nn.Linear(32, 16)
 
-        self.fc_out = nn.Linear(64, self.output_dim)
+        self.fc_out = nn.Linear(16, self.output_dim)
 
         self.tanh = nn.Tanh()
         self.relu = nn.ReLU()
@@ -93,7 +95,14 @@ class GRU_plus_MD(Classifier):
         x = torch.cat((dense1, dense2), dim=1)
         x = self.dense3(x)
         x = self.relu(x)
+
         x = self.dense4(x)
+        x = self.tanh(x)
+
+        x = self.dense5(x)
+        x = self.tanh(x)
+
+        x = self.dense6(x)
 
         return x
     
@@ -121,12 +130,14 @@ class GRU(Classifier):
         self.gru = nn.GRU(input_size=ts_feature_dim, hidden_size=100, num_layers=2, batch_first=True)
 
         # post‐GRU dense on time‐series path
-        self.dense1 = nn.Linear(100, 100)
+        self.dense1 = nn.Linear(100, 64)
 
         # merge & head
-        self.dense2 = nn.Linear(100, 64)
+        self.dense2 = nn.Linear(64, 32)
 
-        self.fc_out = nn.Linear(64, self.output_dim)
+        self.dense3 = nn.Linear(32, 16)
+
+        self.fc_out = nn.Linear(16, self.output_dim)
 
         self.tanh = nn.Tanh()
         self.relu = nn.ReLU()
@@ -151,7 +162,10 @@ class GRU(Classifier):
         dense1 = self.tanh(dense1)
 
         # Merge & head
-        x = self.dense2(dense1)
+        dense2 = self.dense2(dense1)
+        dense2 = self.tanh(dense2)
+
+        x = self.dense3(dense2)
         return x
 
     def forward(self, batch):
@@ -203,6 +217,8 @@ class GRU_MM(Classifier):
         # merge & head
         self.dense3 = nn.Linear(100 + 10 + 64, 100)
         self.dense4 = nn.Linear(100, 64)
+        self.dense5 = nn.Linear(64, 32)
+        self.dense6 = nn.Linear(32, 16)
 
         self.fc_out = nn.Linear(64, self.output_dim)
 
@@ -241,7 +257,14 @@ class GRU_MM(Classifier):
         x = torch.cat((dense1, dense2, swin_fc_out), dim=1)
         x = self.dense3(x)
         x = self.relu(x)
+
         x = self.dense4(x)
+        x = self.tanh(x)
+
+        x = self.dense5(x)
+        x = self.tanh(x)
+
+        x = self.dense6(x)
 
         return x
     
