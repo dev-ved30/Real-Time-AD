@@ -72,7 +72,7 @@ class Trainer:
         self.val_criterion = CrossEntropyLoss(weight=self.val_weights)
 
         # Center loss to help with clustering
-        self.center_loss = CenterLoss(len(self.one_hot_encoder.categories_), 64, device)
+        self.center_loss = CenterLoss(len(self.one_hot_encoder.categories_), 16, device)
         self.center_loss_weight = 1
         
         self.optimizer = optim.Adam(self.parameters(), lr=lr)
