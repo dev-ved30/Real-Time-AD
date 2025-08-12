@@ -257,7 +257,7 @@ class ZTF_SIM_LC_Dataset(torch.utils.data.Dataset):
 
         return self.parquet_df['class'].to_list()
     
-def truncate_ZTF_SIM_light_curve_by_days_since_trigger(x_ts, d):
+def truncate_ZTF_SIM_light_curve_by_days_since_trigger(x_ts, d, normalize_flux=True):
 
     # Get the first detection index
     photflags = x_ts[:,time_dependent_feature_list.index('PHOTFLAG')]
@@ -276,9 +276,14 @@ def truncate_ZTF_SIM_light_curve_by_days_since_trigger(x_ts, d):
     # Truncate the light curve
     x_ts = x_ts[idx, :]
 
+    # Normalize the time series
+    if normalize_flux:
+        flux_index = time_dependent_feature_list.index('FLUXCAL')
+        x_ts[:, flux_index] = (x_ts[:, flux_index] - torch.mean(x_ts[:, flux_index])) / torch.std(x_ts[:, flux_index])
+
     return x_ts
 
-def truncate_ZTF_SIM_light_curve_fractionally(x_ts, f=None):
+def truncate_ZTF_SIM_light_curve_fractionally(x_ts, f=None, normalize_flux=True):
 
     if f == None:
         # Get a random fraction between 0.1 and 1
@@ -293,6 +298,11 @@ def truncate_ZTF_SIM_light_curve_fractionally(x_ts, f=None):
 
     # Truncate the light curve
     x_ts = x_ts[:new_obs_count, :]
+
+    # Normalize the time series
+    if normalize_flux:
+        flux_index = time_dependent_feature_list.index('FLUXCAL')
+        x_ts[:, flux_index] = (x_ts[:, flux_index] - torch.mean(x_ts[:, flux_index])) / torch.std(x_ts[:, flux_index])
 
     return x_ts
 

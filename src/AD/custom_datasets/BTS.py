@@ -386,7 +386,7 @@ class BTS_LC_Dataset(torch.utils.data.Dataset):
         
         return im
     
-def truncate_BTS_light_curve_fractionally(x_ts, x_static, f=None):
+def truncate_BTS_light_curve_fractionally(x_ts, x_static, f=None, normalize_flux=True):
 
     if f == None:
         # Get a random fraction between 0.1 and 1
@@ -403,9 +403,14 @@ def truncate_BTS_light_curve_fractionally(x_ts, x_static, f=None):
     x_ts = x_ts[:new_obs_count, :]
     x_static = x_static[:new_obs_count, :]
 
+    # Normalize the time series
+    if normalize_flux:
+        flux_index = time_dependent_feature_list.index('flux')
+        x_ts[:, flux_index] = (x_ts[:, flux_index] - torch.mean(x_ts[:, flux_index])) / torch.std(x_ts[:, flux_index])
+
     return x_ts, x_static
 
-def truncate_BTS_light_curve_by_days_since_trigger(x_ts, x_static, d=None, add_jitter=False):
+def truncate_BTS_light_curve_by_days_since_trigger(x_ts, x_static, d=None, add_jitter=False, normalize_flux=True):
 
     # NOTE: For BTS we are making the assumption that the data set does not contain any non detections. This is not the case with ELAsTiCC
     if d == None:
@@ -413,12 +418,12 @@ def truncate_BTS_light_curve_by_days_since_trigger(x_ts, x_static, d=None, add_j
 
     # Get the days data
     jd_index = time_dependent_feature_list.index('jd')
+    flux_index = time_dependent_feature_list.index('flux')
+    flux_err_index = time_dependent_feature_list.index('flux_err')
+
     jd = x_ts[:, jd_index]
 
     if add_jitter:
-
-        flux_index = time_dependent_feature_list.index('flux')
-        flux_err_index = time_dependent_feature_list.index('flux_err')
 
         x_ts[:, flux_index] = x_ts[:, flux_index] + np.random.normal([0]*x_ts.shape[0],  x_ts[:, flux_err_index])
         x_ts[:, flux_err_index] = x_ts[:, flux_err_index] + np.random.normal([0]*x_ts.shape[0],  0.01)
@@ -429,6 +434,10 @@ def truncate_BTS_light_curve_by_days_since_trigger(x_ts, x_static, d=None, add_j
     # Truncate the light curve
     x_ts = x_ts[idx, :]
     x_static = x_static[idx, :]
+
+    # Normalize the time series
+    if normalize_flux:
+        x_ts[:, flux_index] = (x_ts[:, flux_index] - torch.mean(x_ts[:, flux_index])) / torch.std(x_ts[:, flux_index])
 
     return x_ts, x_static
 

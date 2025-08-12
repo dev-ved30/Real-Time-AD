@@ -140,7 +140,7 @@ class Tester:
         # Make the umap plots
         Path(f"{self.model_dir}/plots/umap").mkdir(parents=True, exist_ok=True)
         umap_img_file = f"{self.model_dir}/plots/umap/umap_trigger+{d}.pdf"
-        plot_latent_space_umap(combined_embeddings, bts_classes, true_classes, title, umap_img_file)
+        plot_latent_space_umap(combined_embeddings, bts_classes, ztf_ids, true_classes, title, umap_img_file)
 
         # Make the tsne plots
         Path(f"{self.model_dir}/plots/tsne").mkdir(parents=True, exist_ok=True)
@@ -165,7 +165,7 @@ class Tester:
         # Make the umap plots
         Path(f"{self.model_dir}/plots/umap_AD").mkdir(parents=True, exist_ok=True)
         umap_img_file = f"{self.model_dir}/plots/umap_AD/umap_ad_trigger+{d}.pdf"
-        plot_latent_space_umap(combined_embeddings, bts_classes, true_classes, title, umap_img_file)
+        plot_latent_space_umap(combined_embeddings, bts_classes, ztf_ids, true_classes, title, umap_img_file)
 
         # Make the tsne plots
         Path(f"{self.model_dir}/plots/tsne_AD").mkdir(parents=True, exist_ok=True)
@@ -198,7 +198,7 @@ class Tester:
         combined_df['umap2'] = umap_embedding[:, 1]
         combined_df['log_days'] = np.log2(combined_df['days_since_trigger']) + 1
 
-        fig = px.scatter(combined_df, x='umap1', y='umap2', color=f"class", size='log_days', hover_data=['class','days_since_trigger', 'bts_class'])#, cmap='viridis', marker=markers[i])
+        fig = px.scatter(combined_df, x='umap1', y='umap2', color=f"class", size='log_days', hover_data=['class','days_since_trigger','bts_class','ztf_ids'])#, cmap='viridis', marker=markers[i])
         fig.write_html(f"{self.model_dir}/interactive_umap.html")
 
 

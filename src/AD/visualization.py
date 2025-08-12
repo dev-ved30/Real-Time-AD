@@ -215,7 +215,7 @@ def plot_average_performance_over_all_phases(metric, df, model_dir=None):
 
     plt.close()
 
-def plot_latent_space_umap(embeddings, bts_classes, true_classes, title=None, file=None):
+def plot_latent_space_umap(embeddings, bts_classes, ztf_ids, true_classes, title=None, file=None):
 
     plt.close('all')
     plt.style.use(['default'])
@@ -238,8 +238,9 @@ def plot_latent_space_umap(embeddings, bts_classes, true_classes, title=None, fi
     df = pd.DataFrame(umap_embedding, columns=['umap1','umap2'])
     df['class'] = true_classes
     df['bts_class'] = bts_classes
+    df['ztf_ids'] = ztf_ids
 
-    fig = px.scatter(df, x='umap1', y='umap2', color=f"class", hover_data=['class', 'bts_class'])#, cmap='viridis', marker=markers[i])
+    fig = px.scatter(df, x='umap1', y='umap2', color=f"class", hover_data=['class', 'bts_class','ztf_ids'])#, cmap='viridis', marker=markers[i])
     fig.write_html(file.split('.')[0]+'.html')
 
     for c in np.unique(true_classes):
