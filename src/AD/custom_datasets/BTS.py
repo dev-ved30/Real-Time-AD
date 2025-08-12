@@ -405,8 +405,15 @@ def truncate_BTS_light_curve_fractionally(x_ts, x_static, f=None, normalize_flux
 
     # Normalize the time series
     if normalize_flux:
+
         flux_index = time_dependent_feature_list.index('flux')
-        x_ts[:, flux_index] = (x_ts[:, flux_index] - torch.mean(x_ts[:, flux_index])) / torch.std(x_ts[:, flux_index])
+        mean = torch.mean(x_ts[:, flux_index])
+        std = torch.std(x_ts[:, flux_index])
+        
+        if std > 0: 
+            x_ts[:, flux_index] = (x_ts[:, flux_index] - mean) / std
+        else:
+            x_ts[:, flux_index] = (x_ts[:, flux_index] - mean)
 
     return x_ts, x_static
 
@@ -437,7 +444,14 @@ def truncate_BTS_light_curve_by_days_since_trigger(x_ts, x_static, d=None, add_j
 
     # Normalize the time series
     if normalize_flux:
-        x_ts[:, flux_index] = (x_ts[:, flux_index] - torch.mean(x_ts[:, flux_index])) / torch.std(x_ts[:, flux_index])
+
+        mean = torch.mean(x_ts[:, flux_index])
+        std = torch.std(x_ts[:, flux_index])
+        
+        if std > 0: 
+            x_ts[:, flux_index] = (x_ts[:, flux_index] - mean) / std
+        else:
+            x_ts[:, flux_index] = (x_ts[:, flux_index] - mean)
 
     return x_ts, x_static
 
