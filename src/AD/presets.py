@@ -59,7 +59,7 @@ def get_train_loader(model_choice, batch_size, max_n_per_class, excluded_classes
     elif model_choice == "ZTF_Sims-lite":
 
         # Load the training set
-        train_dataset = ZTF_SIM_LC_Dataset(ZTF_sim_train_parquet_path, include_lc_plots=False, transform=truncate_ZTF_SIM_light_curve_fractionally, max_n_per_class=max_n_per_class)
+        train_dataset = ZTF_SIM_LC_Dataset(ZTF_sim_train_parquet_path, include_lc_plots=False, transform=truncate_ZTF_SIM_light_curve_fractionally, max_n_per_class=max_n_per_class, excluded_classes=excluded_classes)
         train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, collate_fn=custom_collate_ZTF_SIM, generator=generator)
 
 
@@ -119,7 +119,7 @@ def get_val_loader(model_choice, batch_size, val_truncation_fractions, excluded_
         val_dataset = []
         for f in val_truncation_fractions:
             transform = partial(truncate_ZTF_SIM_light_curve_fractionally, f=f)
-            val_dataset.append(ZTF_SIM_LC_Dataset(ZTF_sim_val_parquet_path, transform=transform))
+            val_dataset.append(ZTF_SIM_LC_Dataset(ZTF_sim_val_parquet_path, transform=transform, excluded_classes=excluded_classes))
         concatenated_val_dataset = ConcatDataset(val_dataset)
         val_dataloader = DataLoader(concatenated_val_dataset, batch_size=batch_size, shuffle=False, collate_fn=custom_collate_ZTF_SIM, generator=generator)
 
