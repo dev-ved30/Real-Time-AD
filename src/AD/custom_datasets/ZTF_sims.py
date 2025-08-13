@@ -127,7 +127,9 @@ class ZTF_SIM_LC_Dataset(torch.utils.data.Dataset):
         def remove_saturations_from_series(phot_flag_arr, feature_arr):
             
             saturation_mask =  (np.array(phot_flag_arr) & 1024) == 0 
-            feature_arr = np.array(feature_arr)[saturation_mask].tolist()
+            detection_mask = (np.array(phot_flag_arr) & 4096) != 0
+            mask = saturation_mask & detection_mask
+            feature_arr = np.array(feature_arr)[mask].tolist()
 
             return feature_arr
         
@@ -287,7 +289,7 @@ def truncate_ZTF_SIM_light_curve_by_days_since_trigger(x_ts, d, normalize_flux=T
             x_ts[:, flux_index] = (x_ts[:, flux_index] - mean) / std
         else:
             x_ts[:, flux_index] = (x_ts[:, flux_index] - mean)
-            
+
     return x_ts
 
 def truncate_ZTF_SIM_light_curve_fractionally(x_ts, f=None, normalize_flux=True):

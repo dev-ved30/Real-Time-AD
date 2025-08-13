@@ -84,7 +84,7 @@ ZTF_sims_to_Astrophysical_mappings = {
     'SNCC-II': 'SN-II',  
     'SNIa-91bg': 'SN-Ia',   
     'SNIa-x ': 'SN-Ia',  
-    'KN': 'Anomaly',  
+    'KN': 'CV',  # TODO: Add CV class - no too worried about fine tuning
     'SLSN-I': 'SLSN-I',   
     'PISN': 'Anomaly',   
     'ILOT': 'Anomaly',    
