@@ -73,7 +73,7 @@ class Trainer:
 
         # Center loss to help with clustering
         self.center_loss = CenterLoss(len(self.one_hot_encoder.categories_), 16, device)
-        self.center_loss_weight = 1
+        self.center_loss_weight = 0
         
         self.optimizer = optim.Adam(self.parameters(), lr=lr)
 
